@@ -1,0 +1,636 @@
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  ColumnDef,
+  flexRender,
+} from '@tanstack/react-table';
+import {
+  Button,
+  Input,
+  Spinner,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+  Select,
+  SelectItem,
+} from '@heroui/react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { Navbar } from '@/components/Navbar';
+import { useCategories } from '@/hooks/useCategories';
+import type { Product } from '@/types';
+import api from '@/lib/api';
+
+function ProductsContent() {
+  const { categories, loading: categoriesLoading } = useCategories();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [barcodeSearch, setBarcodeSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [stockFilter, setStockFilter] = useState<string>('all');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
+  const [formData, setFormData] = useState({
+    name: '',
+    sku: '',
+    barcode: '',
+    category: '',
+    description: '',
+    cost_price: '',
+    selling_price: '',
+    current_stock: '',
+    minimum_stock_level: '',
+    unit_of_measure: 'PIECE',
+    is_active: true,
+  });
+
+  // Fetch products
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.get('/inventory/products/');
+      const data = response.data as any;
+      setProducts(data.results || data);
+    } catch (err) {
+      const error = err as any;
+      setError(error.response?.data?.message || 'Failed to fetch products');
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Filter products based on all filters
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    
+    return products.filter((product) => {
+      // Global search filter
+      const matchesSearch = !globalFilter || 
+        product.name.toLowerCase().includes(globalFilter.toLowerCase()) ||
+        product.sku.toLowerCase().includes(globalFilter.toLowerCase()) ||
+        (product.barcode && product.barcode.toLowerCase().includes(globalFilter.toLowerCase()));
+
+      // Category filter
+      const matchesCategory = categoryFilter === 'all' || 
+        product.category.toString() === categoryFilter;
+
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || 
+        (statusFilter === 'active' && product.is_active) ||
+        (statusFilter === 'inactive' && !product.is_active);
+
+      // Stock filter
+      const matchesStock = stockFilter === 'all' ||
+        (stockFilter === 'low' && product.current_stock <= product.minimum_stock_level) ||
+        (stockFilter === 'out' && product.current_stock === 0) ||
+        (stockFilter === 'in' && product.current_stock > product.minimum_stock_level);
+
+      return matchesSearch && matchesCategory && matchesStatus && matchesStock;
+    });
+  }, [products, globalFilter, categoryFilter, statusFilter, stockFilter]);
+
+  const columns = useMemo<ColumnDef<Product>[]>(
+    () => [
+      {
+        accessorKey: 'barcode',
+        header: 'Barcode',
+        cell: ({ row }) => (
+          <code className="text-xs bg-[#049AE0]/10 text-[#049AE0] px-3 py-1.5 rounded-md font-mono">
+            {row.original.barcode || 'N/A'}
+          </code>
+        ),
+      },
+      {
+        accessorKey: 'name',
+        header: 'Product Name',
+        cell: ({ row }) => (
+          <div>
+            <p className="font-semibold text-[#242832]">{row.original.name}</p>
+            <p className="text-xs text-default-500 mt-0.5">{row.original.sku}</p>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'category_name',
+        header: 'Category',
+        cell: ({ row }) => (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+            {row.original.category_name}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'selling_price',
+        header: 'Price',
+        cell: ({ row }) => (
+          <span className="font-semibold text-[#242832]">
+            ${parseFloat(row.original.selling_price).toFixed(2)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'current_stock',
+        header: 'Stock',
+        cell: ({ row }) => {
+          const stock = row.original.current_stock;
+          const reorder = row.original.minimum_stock_level;
+          const color = stock === 0 ? 'bg-red-100 text-red-700' : stock <= reorder ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700';
+          return (
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${color}`}>
+              {stock}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'is_active',
+        header: 'Status',
+        cell: ({ row }) => (
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+            row.original.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {row.original.is_active ? 'Active' : 'Inactive'}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => (
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleEdit(row.original)}
+              className="px-4 py-2 text-sm font-medium text-[#049AE0] bg-white border border-[#049AE0] rounded-lg hover:bg-[#049AE0] hover:text-white transition-colors duration-200"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => handleDelete(row.original.id)}
+              className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-600 hover:text-white transition-colors duration-200"
+            >
+              Delete
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const table = useReactTable({
+    data: filteredProducts,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+  });
+
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      sku: product.sku,
+      barcode: product.barcode || '',
+      category: product.category.toString(),
+      description: product.description || '',
+      cost_price: product.cost_price,
+      selling_price: product.selling_price,
+      current_stock: product.current_stock.toString(),
+      minimum_stock_level: product.minimum_stock_level.toString(),
+      unit_of_measure: product.unit_of_measure,
+      is_active: product.is_active,
+    });
+    onOpen();
+  };
+
+  const handleCreate = () => {
+    setEditingProduct(null);
+    setFormData({
+      name: '',
+      sku: '',
+      barcode: '',
+      category: '',
+      description: '',
+      cost_price: '',
+      selling_price: '',
+      current_stock: '0',
+      minimum_stock_level: '10',
+      unit_of_measure: 'PIECE',
+      is_active: true,
+    });
+    onOpen();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+      try {
+        await api.delete(`/inventory/products/${id}/`);
+        await fetchProducts();
+      } catch (err) {
+        const error = err as any;
+        setError(error.response?.data?.message || 'Failed to delete product');
+      }
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const data = {
+        ...formData,
+        category: parseInt(formData.category),
+        current_stock: parseInt(formData.current_stock),
+        minimum_stock_level: parseInt(formData.minimum_stock_level),
+        barcode: formData.barcode || undefined,
+      };
+
+      if (editingProduct) {
+        await api.put(`/inventory/products/${editingProduct.id}/`, data);
+      } else {
+        await api.post('/inventory/products/', data);
+      }
+      await fetchProducts();
+      onClose();
+    } catch (err) {
+      const error = err as any;
+      setError(error.response?.data?.message || 'Failed to save product');
+    }
+  };
+
+  const handleBarcodeSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && barcodeSearch.trim()) {
+      try {
+        const response = await api.get<Product>(`/inventory/products/barcode/${barcodeSearch.trim()}/`);
+        if (response.data) {
+          setGlobalFilter(response.data.name);
+        }
+      } catch (error) {
+        alert('Product not found');
+      }
+      setBarcodeSearch('');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA]">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+          <Spinner size="lg" color="primary" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F5F7FA]">
+      <Navbar />
+      <div className="p-4 sm:p-6 lg:p-8 xl:p-12 space-y-4 sm:space-y-6 xl:space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-[#242832]">Products</h1>
+            <p className="text-sm sm:text-base xl:text-lg text-default-500 mt-1">Manage your inventory items</p>
+          </div>
+          <Button 
+            className="bg-[#049AE0] text-white font-semibold px-6 h-11 w-full sm:w-auto" 
+            onPress={handleCreate}
+          >
+            + Add Product
+          </Button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 xl:p-8">
+          <h3 className="text-xs sm:text-sm xl:text-base font-semibold text-[#049AE0] uppercase tracking-wide mb-3 sm:mb-4 xl:mb-6">Filters</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 xl:gap-6">
+            <Input
+              placeholder="Search products..."
+              value={globalFilter ?? ''}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="w-full"
+              classNames={{
+                input: "text-sm focus:!outline-none",
+                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] focus-within:!border-[#049AE0] shadow-sm"
+              }}
+            />
+            <Input
+              placeholder="Scan barcode..."
+              value={barcodeSearch}
+              onChange={(e) => setBarcodeSearch(e.target.value)}
+              onKeyDown={handleBarcodeSearch}
+              className="w-full"
+              classNames={{
+                input: "text-sm focus:!outline-none",
+                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] focus-within:!border-[#049AE0] shadow-sm"
+              }}
+            />
+            <Select
+              placeholder="Category"
+              selectedKeys={[categoryFilter]}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full"
+              classNames={{
+                trigger: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+                value: "text-sm"
+              }}
+            >
+              <SelectItem key="all">All Categories</SelectItem>
+              {categories?.map((cat) => (
+                <SelectItem key={cat.id.toString()}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </Select>
+            <Select
+              placeholder="Status"
+              selectedKeys={[statusFilter]}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full"
+              classNames={{
+                trigger: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+                value: "text-sm"
+              }}
+            >
+              <SelectItem key="all">All Status</SelectItem>
+              <SelectItem key="active">Active</SelectItem>
+              <SelectItem key="inactive">Inactive</SelectItem>
+            </Select>
+            <Select
+              placeholder="Stock Level"
+              selectedKeys={[stockFilter]}
+              onChange={(e) => setStockFilter(e.target.value)}
+              className="w-full"
+              classNames={{
+                trigger: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+                value: "text-sm"
+              }}
+            >
+              <SelectItem key="all">All Stock</SelectItem>
+              <SelectItem key="in">In Stock</SelectItem>
+              <SelectItem key="low">Low Stock</SelectItem>
+              <SelectItem key="out">Out of Stock</SelectItem>
+            </Select>
+          </div>
+          {(globalFilter || categoryFilter !== 'all' || statusFilter !== 'all' || stockFilter !== 'all') && (
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  setGlobalFilter('');
+                  setCategoryFilter('all');
+                  setStatusFilter('all');
+                  setStockFilter('all');
+                }}
+                className="px-4 py-2 text-sm font-medium text-[#049AE0] bg-[#049AE0]/5 border border-[#049AE0]/20 rounded-lg hover:bg-[#049AE0]/10 transition-colors"
+              >
+                Clear All Filters
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="px-4 sm:px-6 xl:px-8 py-3 sm:py-4 xl:py-5 text-left text-xs sm:text-sm font-semibold text-[#242832] uppercase tracking-wider"
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 sm:px-6 xl:px-8 py-3 sm:py-4 xl:py-5 text-xs sm:text-sm xl:text-base">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 sm:px-6 xl:px-8 py-4 xl:py-5 border-t border-gray-200 bg-gray-50">
+            <div className="text-xs sm:text-sm xl:text-base text-default-600">
+              Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+              {Math.min(
+                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                filteredProducts.length
+              )}{' '}
+              of {filteredProducts.length} products
+              {filteredProducts.length !== products.length && (
+                <span className="text-[#049AE0] font-medium"> (filtered from {products.length})</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 justify-between sm:justify-end">
+              <span className="text-xs sm:text-sm text-default-600">
+                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-[#242832] bg-white border border-gray-300 rounded-lg hover:border-[#049AE0] hover:text-[#049AE0] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:text-[#242832] transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-[#242832] bg-white border border-gray-300 rounded-lg hover:border-[#049AE0] hover:text-[#049AE0] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:text-[#242832] transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Modal isOpen={isOpen} onClose={onClose} size="3xl" scrollBehavior="inside">
+          <ModalContent>
+            <ModalHeader className="text-xl font-bold text-[#242832] border-b pb-4">
+              {editingProduct ? 'Edit Product' : 'Add New Product'}
+            </ModalHeader>
+            <ModalBody className="py-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="Product Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  isRequired
+                  placeholder="Enter product name"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Input
+                  label="SKU"
+                  value={formData.sku}
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  isRequired
+                  placeholder="Stock Keeping Unit"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Input
+                  label="Barcode"
+                  value={formData.barcode}
+                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                  placeholder="Scan or enter barcode"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Select
+                  label="Category"
+                  selectedKeys={formData.category ? [formData.category] : []}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  isRequired
+                  isDisabled={categoriesLoading}
+                >
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id.toString()}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+                <Input
+                  label="Cost Price"
+                  type="number"
+                  value={formData.cost_price}
+                  onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                  startContent={<span className="text-default-400">$</span>}
+                  isRequired
+                  placeholder="0.00"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Input
+                  label="Selling Price"
+                  type="number"
+                  value={formData.selling_price}
+                  onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                  startContent={<span className="text-default-400">$</span>}
+                  isRequired
+                  placeholder="0.00"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Input
+                  label="Stock Quantity"
+                  type="number"
+                  value={formData.current_stock}
+                  onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
+                  isRequired
+                  placeholder="Current stock"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Input
+                  label="Minimum Stock Level"
+                  type="number"
+                  value={formData.minimum_stock_level}
+                  onChange={(e) => setFormData({ ...formData, minimum_stock_level: e.target.value })}
+                  isRequired
+                  placeholder="Reorder level"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Select
+                  label="Unit of Measure"
+                  selectedKeys={[formData.unit_of_measure]}
+                  onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
+                  isRequired
+                >
+                  <SelectItem key="PIECE">Piece</SelectItem>
+                  <SelectItem key="BOX">Box</SelectItem>
+                  <SelectItem key="SET">Set</SelectItem>
+                  <SelectItem key="PAIR">Pair</SelectItem>
+                  <SelectItem key="LITER">Liter</SelectItem>
+                  <SelectItem key="KG">Kilogram</SelectItem>
+                  <SelectItem key="METER">Meter</SelectItem>
+                </Select>
+                <div className="md:col-span-2">
+                  <Input
+                    label="Description (Optional)"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Product description or notes"
+                    classNames={{
+                      inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                    }}
+                  />
+                </div>
+              </div>
+            </ModalBody>
+            <ModalFooter className="border-t pt-4">
+              <Button 
+                variant="flat" 
+                onPress={onClose}
+                className="border border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="bg-[#049AE0] text-white font-semibold hover:bg-[#0388c9]"
+                onPress={handleSubmit}
+              >
+                {editingProduct ? 'Update Product' : 'Create Product'}
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      </div>
+    </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <ProtectedRoute>
+      <ProductsContent />
+    </ProtectedRoute>
+  );
+}
