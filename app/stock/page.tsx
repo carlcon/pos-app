@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Button,
   Input,
@@ -17,11 +17,15 @@ import {
   ModalFooter,
   useDisclosure,
   Textarea,
+  addToast,
 } from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useStock } from '@/hooks/useStock';
 import { useProducts } from '@/hooks/useProducts';
+
+type TransactionType = 'IN' | 'OUT' | 'ADJUSTMENT';
+type ReasonType = 'PURCHASE' | 'SALE' | 'DAMAGED' | 'LOST' | 'RECONCILIATION' | 'RETURN' | 'MANUAL';
 
 function StockContent() {
   const { transactions, loading, error, createAdjustment } = useStock();
@@ -29,33 +33,104 @@ function StockContent() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [formData, setFormData] = useState({
     product: '',
-    transaction_type: 'IN' as 'IN' | 'OUT' | 'ADJUSTMENT',
-    reason: 'MANUAL' as 'PURCHASE' | 'SALE' | 'DAMAGED' | 'LOST' | 'RECONCILIATION' | 'RETURN' | 'MANUAL',
+    transaction_type: 'IN' as TransactionType,
+    reason: 'MANUAL' as ReasonType,
     quantity: '',
     reference_number: '',
     notes: '',
   });
 
+  // Get reasons based on transaction type
+  const reasonOptions = useMemo(() => {
+    switch (formData.transaction_type) {
+      case 'IN':
+        return [
+          { key: 'PURCHASE', label: 'Purchase Order Receipt' },
+          { key: 'RETURN', label: 'Customer Return' },
+          { key: 'MANUAL', label: 'Manual Adjustment' },
+        ];
+      case 'OUT':
+        return [
+          { key: 'SALE', label: 'Sale' },
+          { key: 'DAMAGED', label: 'Damaged' },
+          { key: 'LOST', label: 'Lost' },
+          { key: 'RETURN', label: 'Return to Supplier' },
+          { key: 'MANUAL', label: 'Manual Adjustment' },
+        ];
+      case 'ADJUSTMENT':
+        return [
+          { key: 'RECONCILIATION', label: 'Stock Reconciliation' },
+          { key: 'MANUAL', label: 'Manual Adjustment' },
+        ];
+      default:
+        return [{ key: 'MANUAL', label: 'Manual Adjustment' }];
+    }
+  }, [formData.transaction_type]);
+
+  // Reset reason when transaction type changes
+  const handleTransactionTypeChange = (type: TransactionType) => {
+    const defaultReason = type === 'IN' ? 'PURCHASE' : type === 'OUT' ? 'SALE' : 'RECONCILIATION';
+    setFormData({
+      ...formData,
+      transaction_type: type,
+      reason: defaultReason as ReasonType,
+    });
+  };
+
+  // Get selected product name for display
+  const selectedProduct = useMemo(() => {
+    if (!formData.product || !products) return null;
+    return products.find(p => p.id.toString() === formData.product);
+  }, [formData.product, products]);
+
   const handleSubmit = async () => {
+    if (!formData.product || !formData.quantity) {
+      addToast({
+        title: 'Validation Error',
+        description: 'Please select a product and enter quantity',
+        color: 'warning',
+      });
+      return;
+    }
+    
     const data = {
-      product: parseInt(formData.product),
-      transaction_type: formData.transaction_type,
+      product_id: parseInt(formData.product),
+      adjustment_type: formData.transaction_type,
       reason: formData.reason,
       quantity: parseInt(formData.quantity),
       reference_number: formData.reference_number || undefined,
       notes: formData.notes || undefined,
     };
 
-    await createAdjustment(data);
-    setFormData({
-      product: '',
-      transaction_type: 'IN',
-      reason: 'MANUAL',
-      quantity: '',
-      reference_number: '',
-      notes: '',
-    });
-    onClose();
+    try {
+      await createAdjustment(data);
+      addToast({
+        title: 'Transaction Created',
+        description: 'Stock adjustment has been recorded successfully',
+        color: 'success',
+      });
+      setFormData({
+        product: '',
+        transaction_type: 'IN',
+        reason: 'MANUAL',
+        quantity: '',
+        reference_number: '',
+        notes: '',
+      });
+      onClose();
+    } catch (err) {
+      console.error('Stock adjustment error:', err);
+      const error = err as { response?: { data?: { error?: string; message?: string; detail?: string } } };
+      const errorMessage = error.response?.data?.error ||
+                          error.response?.data?.message || 
+                          error.response?.data?.detail ||
+                          'Failed to create stock transaction';
+      addToast({
+        title: 'Transaction Failed',
+        description: errorMessage,
+        color: 'danger',
+      });
+    }
   };
 
   const getTransactionColor = (type: string) => {
@@ -186,13 +261,23 @@ function StockContent() {
               <div className="space-y-4">
                 <Select
                   label="Product"
+                  placeholder="Select a product"
                   selectedKeys={formData.product ? [formData.product] : []}
                   onChange={(e) => setFormData({ ...formData, product: e.target.value })}
                   isRequired
+                  renderValue={() => {
+                    if (selectedProduct) {
+                      return `${selectedProduct.name} (${selectedProduct.sku})`;
+                    }
+                    return null;
+                  }}
                 >
                   {products?.map((product) => (
-                    <SelectItem key={product.id.toString()}>
-                      {product.name} ({product.sku})
+                    <SelectItem key={product.id.toString()} textValue={`${product.name} (${product.sku})`}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{product.name}</span>
+                        <span className="text-xs text-default-500">{product.sku} • Stock: {product.current_stock}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </Select>
@@ -200,17 +285,12 @@ function StockContent() {
                 <Select
                   label="Transaction Type"
                   selectedKeys={[formData.transaction_type]}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      transaction_type: e.target.value as 'IN' | 'OUT' | 'ADJUSTMENT',
-                    })
-                  }
+                  onChange={(e) => handleTransactionTypeChange(e.target.value as TransactionType)}
                   isRequired
                 >
                   <SelectItem key="IN">Stock In</SelectItem>
                   <SelectItem key="OUT">Stock Out</SelectItem>
-                  <SelectItem key="ADJUSTMENT">Adjustment</SelectItem>
+                  <SelectItem key="ADJUSTMENT">Adjustment (Set Exact Quantity)</SelectItem>
                 </Select>
 
                 <Select
@@ -219,26 +299,23 @@ function StockContent() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      reason: e.target.value as typeof formData.reason,
+                      reason: e.target.value as ReasonType,
                     })
                   }
                   isRequired
                 >
-                  <SelectItem key="PURCHASE">Purchase</SelectItem>
-                  <SelectItem key="SALE">Sale</SelectItem>
-                  <SelectItem key="DAMAGED">Damaged</SelectItem>
-                  <SelectItem key="LOST">Lost</SelectItem>
-                  <SelectItem key="RECONCILIATION">Reconciliation</SelectItem>
-                  <SelectItem key="RETURN">Return</SelectItem>
-                  <SelectItem key="MANUAL">Manual Adjustment</SelectItem>
+                  {reasonOptions.map((option) => (
+                    <SelectItem key={option.key}>{option.label}</SelectItem>
+                  ))}
                 </Select>
 
                 <Input
-                  label="Quantity"
+                  label={formData.transaction_type === 'ADJUSTMENT' ? 'New Stock Quantity' : 'Quantity'}
                   type="number"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                   isRequired
+                  description={formData.transaction_type === 'ADJUSTMENT' ? 'This will set the stock to this exact amount' : undefined}
                 />
 
                 <Input
@@ -252,6 +329,12 @@ function StockContent() {
                   label="Notes"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
                   placeholder="Additional information..."
                 />
               </div>

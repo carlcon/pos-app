@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -21,6 +21,7 @@ import {
   useDisclosure,
   Select,
   SelectItem,
+  addToast,
 } from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
@@ -105,6 +106,55 @@ function ProductsContent() {
       return matchesSearch && matchesCategory && matchesStatus && matchesStock;
     });
   }, [products, globalFilter, categoryFilter, statusFilter, stockFilter]);
+
+  // Define handlers with useCallback before columns so they can be used in the dependency array
+  const handleEdit = useCallback((product: Product) => {
+    console.log('Edit clicked for product:', product);
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      sku: product.sku,
+      barcode: product.barcode || '',
+      category: product.category.toString(),
+      description: product.description || '',
+      cost_price: product.cost_price,
+      selling_price: product.selling_price,
+      current_stock: product.current_stock.toString(),
+      minimum_stock_level: product.minimum_stock_level.toString(),
+      unit_of_measure: product.unit_of_measure,
+      is_active: product.is_active,
+    });
+    onOpen();
+  }, [onOpen]);
+
+  const handleDelete = useCallback(async (id: number) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+      try {
+        setError(null);
+        console.log('Deleting product:', id);
+        await api.delete(`/inventory/products/${id}/`);
+        console.log('Product deleted successfully');
+        addToast({
+          title: 'Product Deleted',
+          description: 'The product has been successfully deleted.',
+          color: 'success',
+        });
+        await fetchProducts();
+      } catch (err) {
+        console.error('Delete error:', err);
+        const error = err as { response?: { data?: { message?: string; detail?: string } } };
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.detail ||
+                            'Failed to delete product. It may be referenced in sales or purchase orders.';
+        setError(errorMessage);
+        addToast({
+          title: 'Delete Failed',
+          description: errorMessage,
+          color: 'danger',
+        });
+      }
+    }
+  }, []);
 
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
@@ -191,8 +241,7 @@ function ProductsContent() {
         ),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [handleEdit, handleDelete]
   );
 
   const table = useReactTable({
@@ -207,24 +256,6 @@ function ProductsContent() {
       },
     },
   });
-
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      sku: product.sku,
-      barcode: product.barcode || '',
-      category: product.category.toString(),
-      description: product.description || '',
-      cost_price: product.cost_price,
-      selling_price: product.selling_price,
-      current_stock: product.current_stock.toString(),
-      minimum_stock_level: product.minimum_stock_level.toString(),
-      unit_of_measure: product.unit_of_measure,
-      is_active: product.is_active,
-    });
-    onOpen();
-  };
 
   const handleCreate = () => {
     setEditingProduct(null);
@@ -244,38 +275,66 @@ function ProductsContent() {
     onOpen();
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      try {
-        await api.delete(`/inventory/products/${id}/`);
-        await fetchProducts();
-      } catch (err) {
-        const error = err as any;
-        setError(error.response?.data?.message || 'Failed to delete product');
-      }
-    }
-  };
-
   const handleSubmit = async () => {
     try {
+      setError(null); // Clear previous errors
+      
+      // Validate required fields
+      if (!formData.name || !formData.sku || !formData.category || !formData.cost_price || !formData.selling_price) {
+        setError('Please fill in all required fields');
+        addToast({
+          title: 'Validation Error',
+          description: 'Please fill in all required fields',
+          color: 'warning',
+        });
+        return;
+      }
+
       const data = {
         ...formData,
         category: parseInt(formData.category),
-        current_stock: parseInt(formData.current_stock),
-        minimum_stock_level: parseInt(formData.minimum_stock_level),
-        barcode: formData.barcode || undefined,
+        current_stock: parseInt(formData.current_stock) || 0,
+        minimum_stock_level: parseInt(formData.minimum_stock_level) || 10,
+        barcode: formData.barcode || null,
+        description: formData.description || '',
       };
 
+      console.log('Submitting product data:', data);
+
       if (editingProduct) {
-        await api.put(`/inventory/products/${editingProduct.id}/`, data);
+        const response = await api.put(`/inventory/products/${editingProduct.id}/`, data);
+        console.log('Update response:', response.data);
+        addToast({
+          title: 'Product Updated',
+          description: `"${formData.name}" has been successfully updated.`,
+          color: 'success',
+        });
       } else {
-        await api.post('/inventory/products/', data);
+        const response = await api.post('/inventory/products/', data);
+        console.log('Create response:', response.data);
+        addToast({
+          title: 'Product Created',
+          description: `"${formData.name}" has been successfully added.`,
+          color: 'success',
+        });
       }
+      
       await fetchProducts();
       onClose();
+      setError(null);
     } catch (err) {
-      const error = err as any;
-      setError(error.response?.data?.message || 'Failed to save product');
+      console.error('Product save error:', err);
+      const error = err as { response?: { data?: { message?: string; detail?: string } } };
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.detail ||
+                          JSON.stringify(error.response?.data) ||
+                          'Failed to save product';
+      setError(errorMessage);
+      addToast({
+        title: editingProduct ? 'Update Failed' : 'Create Failed',
+        description: errorMessage,
+        color: 'danger',
+      });
     }
   };
 
@@ -483,12 +542,22 @@ function ProductsContent() {
           </div>
         </div>
 
-        <Modal isOpen={isOpen} onClose={onClose} size="3xl" scrollBehavior="inside">
+        <Modal 
+          isOpen={isOpen} 
+          onClose={onClose} 
+          size="3xl" 
+          scrollBehavior="inside"
+        >
           <ModalContent>
             <ModalHeader className="text-xl font-bold text-[#242832] border-b pb-4">
               {editingProduct ? 'Edit Product' : 'Add New Product'}
             </ModalHeader>
             <ModalBody className="py-6">
+              {error && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
                   label="Product Name"
@@ -525,12 +594,19 @@ function ProductsContent() {
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   isRequired
                   isDisabled={categoriesLoading}
+                  classNames={{
+                    trigger: "bg-white border border-gray-200 hover:border-[#049AE0]"
+                  }}
                 >
-                  {categories?.map((cat) => (
-                    <SelectItem key={cat.id.toString()}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
+                  {categories && categories.length > 0 ? (
+                    categories.map((cat) => (
+                      <SelectItem key={cat.id.toString()}>
+                        {cat.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem key="loading">Loading categories...</SelectItem>
+                  )}
                 </Select>
                 <Input
                   label="Cost Price"

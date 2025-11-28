@@ -16,6 +16,7 @@ import {
   ModalBody,
   ModalFooter,
   useDisclosure,
+  addToast,
 } from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
@@ -40,6 +41,7 @@ function POSContent() {
   const barcodeRef = useRef<HTMLInputElement>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [lastSaleNumber, setLastSaleNumber] = useState('');
+  const [lastSaleTotal, setLastSaleTotal] = useState(0);
 
   // Auto-focus barcode input
   useEffect(() => {
@@ -121,7 +123,11 @@ function POSContent() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
-      alert('Cart is empty');
+      addToast({
+        title: 'Cart Empty',
+        description: 'Please add items to cart before checkout',
+        color: 'warning',
+      });
       return;
     }
 
@@ -139,14 +145,30 @@ function POSContent() {
       const sale = await createSale(saleData);
       if (sale) {
         setLastSaleNumber(sale.sale_number);
+        setLastSaleTotal(total); // Save total before clearing cart
+        addToast({
+          title: 'Sale Completed',
+          description: `Sale ${sale.sale_number} processed successfully`,
+          color: 'success',
+        });
         onOpen();
         // Clear cart and reset
         setCart([]);
         setCustomerName('');
         setPaymentMethod('CASH');
       }
-    } catch {
-      alert('Error processing sale');
+    } catch (err) {
+      console.error('Checkout error:', err);
+      const error = err as { response?: { data?: { message?: string; detail?: string; stock?: string } } };
+      const errorMessage = error.response?.data?.stock ||
+                          error.response?.data?.message || 
+                          error.response?.data?.detail ||
+                          'Error processing sale';
+      addToast({
+        title: 'Checkout Failed',
+        description: errorMessage,
+        color: 'danger',
+      });
     }
   };
 
@@ -331,7 +353,7 @@ function POSContent() {
               <div className="text-6xl mb-4">✓</div>
               <h3 className="text-2xl font-bold mb-2">Transaction Successful</h3>
               <p className="text-default-500">Sale Number: {lastSaleNumber}</p>
-              <p className="text-3xl font-bold text-primary mt-4">${total.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-primary mt-4">${lastSaleTotal.toFixed(2)}</p>
             </ModalBody>
             <ModalFooter>
               <Button color="primary" onPress={handleNewSale} className="w-full">

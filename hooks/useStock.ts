@@ -3,8 +3,8 @@ import api from '@/lib/api';
 import type { StockTransaction, PaginatedResponse } from '@/types';
 
 interface CreateStockAdjustment {
-  product: number;
-  transaction_type: 'IN' | 'OUT' | 'ADJUSTMENT';
+  product_id: number;
+  adjustment_type: 'IN' | 'OUT' | 'ADJUSTMENT';
   reason: 'PURCHASE' | 'SALE' | 'DAMAGED' | 'LOST' | 'RECONCILIATION' | 'RETURN' | 'MANUAL';
   quantity: number;
   reference_number?: string;
@@ -37,7 +37,7 @@ export function useStock() {
   }, [fetchTransactions]);
 
   const createAdjustment = async (data: CreateStockAdjustment) => {
-    const response = await api.post<StockTransaction>('/stock/adjustments/', data);
+    const response = await api.post<StockTransaction>('/stock/adjust/', data);
     await fetchTransactions();
     return response.data;
   };

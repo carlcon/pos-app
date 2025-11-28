@@ -26,7 +26,7 @@ export function useSales() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<PaginatedResponse<Sale>>(`/sales/sales/?page=${page}`);
+      const response = await api.get<PaginatedResponse<Sale>>(`/sales/?page=${page}`);
       setSales(response.data.results);
       setTotalCount(response.data.count);
     } catch (err: any) {
@@ -41,9 +41,14 @@ export function useSales() {
   }, [fetchSales]);
 
   const createSale = async (data: CreateSaleData) => {
-    const response = await api.post<Sale>('/sales/sales/', data);
-    await fetchSales();
-    return response.data;
+    try {
+      const response = await api.post<Sale>('/sales/', data);
+      await fetchSales();
+      return response.data;
+    } catch (error) {
+      // Re-throw the error so the calling component can handle it
+      throw error;
+    }
   };
 
   return {
