@@ -23,6 +23,8 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useStock } from '@/hooks/useStock';
 import { useProducts } from '@/hooks/useProducts';
+import { jsPDF } from 'jspdf';
+import JsBarcode from 'jsbarcode';
 
 type TransactionType = 'IN' | 'OUT' | 'ADJUSTMENT';
 type ReasonType = 'PURCHASE' | 'SALE' | 'DAMAGED' | 'LOST' | 'RECONCILIATION' | 'RETURN' | 'MANUAL';
@@ -31,6 +33,7 @@ function StockContent() {
   const { transactions, loading, error, createAdjustment } = useStock();
   const { products } = useProducts();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isBarcodeOpen, onOpen: onBarcodeOpen, onClose: onBarcodeClose } = useDisclosure();
   const [formData, setFormData] = useState({
     product: '',
     transaction_type: 'IN' as TransactionType,
@@ -40,6 +43,41 @@ function StockContent() {
     reference_number: '',
     notes: '',
   });
+  const [barcodeFormData, setBarcodeFormData] = useState<{
+    products: { productId: string; quantity: string }[];
+  }>({
+    products: [{ productId: '', quantity: '1' }],
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Get selected products for barcode printing
+  const getProductById = (productId: string) => {
+    if (!productId || !products) return null;
+    return products.find(p => p.id.toString() === productId);
+  };
+
+  // Add product to barcode list
+  const addBarcodeProduct = () => {
+    setBarcodeFormData({
+      products: [...barcodeFormData.products, { productId: '', quantity: '1' }],
+    });
+  };
+
+  // Remove product from barcode list
+  const removeBarcodeProduct = (index: number) => {
+    if (barcodeFormData.products.length > 1) {
+      setBarcodeFormData({
+        products: barcodeFormData.products.filter((_, i) => i !== index),
+      });
+    }
+  };
+
+  // Update product in barcode list
+  const updateBarcodeProduct = (index: number, field: 'productId' | 'quantity', value: string) => {
+    const updated = [...barcodeFormData.products];
+    updated[index] = { ...updated[index], [field]: value };
+    setBarcodeFormData({ products: updated });
+  };
 
   // Get reasons based on transaction type
   const reasonOptions = useMemo(() => {
@@ -83,6 +121,145 @@ function StockContent() {
     if (!formData.product || !products) return null;
     return products.find(p => p.id.toString() === formData.product);
   }, [formData.product, products]);
+
+  // Generate barcode PDF for multiple products
+  const generateBarcodePDF = async () => {
+    // Validate products
+    const validProducts = barcodeFormData.products.filter(p => {
+      const product = getProductById(p.productId);
+      return product && product.barcode && parseInt(p.quantity) > 0;
+    });
+
+    if (validProducts.length === 0) {
+      addToast({
+        title: 'Error',
+        description: 'Please select at least one product with a barcode',
+        color: 'danger',
+      });
+      return;
+    }
+
+    // Calculate total labels
+    const totalLabels = validProducts.reduce((sum, p) => sum + (parseInt(p.quantity) || 0), 0);
+    if (totalLabels > 500) {
+      addToast({
+        title: 'Error',
+        description: 'Maximum 500 labels per PDF',
+        color: 'danger',
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      // Create PDF - A4 format
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Label dimensions (50mm x 30mm for better layout)
+      const labelWidth = 60;
+      const labelHeight = 30;
+      const marginX = 10;
+      const marginY = 10;
+      const gapX = 5;
+      const gapY = 5;
+      const labelsPerRow = 3;
+      const labelsPerCol = 8;
+      const labelsPerPage = labelsPerRow * labelsPerCol;
+
+      let labelIndex = 0;
+
+      // Loop through each product and its quantity
+      for (const item of validProducts) {
+        const product = getProductById(item.productId);
+        if (!product || !product.barcode) continue;
+
+        const quantity = parseInt(item.quantity) || 1;
+
+        for (let i = 0; i < quantity; i++) {
+          // Calculate position
+          const positionOnPage = labelIndex % labelsPerPage;
+          const col = positionOnPage % labelsPerRow;
+          const row = Math.floor(positionOnPage / labelsPerRow);
+
+          // Add new page if needed
+          if (labelIndex > 0 && positionOnPage === 0) {
+            pdf.addPage();
+          }
+
+          const x = marginX + col * (labelWidth + gapX);
+          const y = marginY + row * (labelHeight + gapY);
+
+          // Create a canvas for barcode
+          const canvas = document.createElement('canvas');
+          JsBarcode(canvas, product.barcode, {
+            format: 'CODE128',
+            width: 2,
+            height: 50,
+            displayValue: true,
+            fontSize: 14,
+            margin: 2,
+            textMargin: 2,
+          });
+
+          // Add barcode image to PDF
+          const barcodeImage = canvas.toDataURL('image/png');
+          pdf.addImage(barcodeImage, 'PNG', x + 2, y + 1, labelWidth - 4, 18);
+
+          // Add product name (truncated if too long)
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'normal');
+          const productName = product.name.length > 30 
+            ? product.name.substring(0, 30) + '...' 
+            : product.name;
+          pdf.text(productName, x + labelWidth / 2, y + 22, { align: 'center' });
+
+          // Add SKU
+          pdf.setFontSize(6);
+          pdf.setTextColor(100, 100, 100);
+          pdf.text(`SKU: ${product.sku}`, x + labelWidth / 2, y + 25, { align: 'center' });
+
+          // Add price with PHP symbol
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(0, 0, 0);
+          const price = parseFloat(product.selling_price).toFixed(2);
+          pdf.text(`PHP ${price}`, x + labelWidth / 2, y + 29, { align: 'center' });
+          pdf.setFont('helvetica', 'normal');
+
+          labelIndex++;
+        }
+      }
+
+      // Generate filename
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const productCount = validProducts.length;
+      pdf.save(`barcodes-${productCount}products-${totalLabels}labels-${timestamp}.pdf`);
+
+      addToast({
+        title: 'Success',
+        description: `Generated ${totalLabels} barcode label(s) for ${productCount} product(s)`,
+        color: 'success',
+      });
+
+      // Reset form and close modal
+      setBarcodeFormData({ products: [{ productId: '', quantity: '1' }] });
+      onBarcodeClose();
+    } catch (err) {
+      console.error('Barcode generation error:', err);
+      addToast({
+        title: 'Error',
+        description: 'Failed to generate barcode PDF',
+        color: 'danger',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!formData.product || !formData.quantity) {
@@ -190,9 +367,18 @@ function StockContent() {
             <h1 className="text-2xl sm:text-3xl xl:text-4xl font-bold text-foreground">Stock Management</h1>
             <p className="text-sm sm:text-base xl:text-lg text-default-500 mt-1">Track inventory movements and adjustments</p>
           </div>
-          <Button color="primary" onPress={onOpen} className="w-full sm:w-auto">
-            + New Transaction
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button 
+              variant="bordered" 
+              onPress={onBarcodeOpen} 
+              className="flex-1 sm:flex-none border-primary text-primary"
+            >
+              🏷️ Print Barcodes
+            </Button>
+            <Button color="primary" onPress={onOpen} className="flex-1 sm:flex-none">
+              + New Transaction
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -389,6 +575,152 @@ function StockContent() {
               </Button>
               <Button color="primary" onPress={handleSubmit}>
                 Create Transaction
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Barcode Print Modal */}
+        <Modal isOpen={isBarcodeOpen} onClose={onBarcodeClose} size="2xl" scrollBehavior="inside">
+          <ModalContent>
+            <ModalHeader>Print Barcode Labels</ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm font-medium text-default-700">Select Products</p>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="primary"
+                    onPress={addBarcodeProduct}
+                  >
+                    + Add Product
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {barcodeFormData.products.map((item, index) => {
+                    const product = getProductById(item.productId);
+                    return (
+                      <Card key={index} className="bg-default-50">
+                        <CardBody className="p-4">
+                          <div className="flex flex-col gap-3">
+                            <div className="flex gap-3 items-start">
+                              <div className="flex-1">
+                                <Select
+                                  label="Product"
+                                  placeholder="Select a product"
+                                  size="sm"
+                                  selectedKeys={item.productId ? [item.productId] : []}
+                                  onChange={(e) => updateBarcodeProduct(index, 'productId', e.target.value)}
+                                  renderValue={() => {
+                                    if (product) {
+                                      return `${product.name}`;
+                                    }
+                                    return null;
+                                  }}
+                                >
+                                  {products?.filter(p => p.barcode).map((p) => (
+                                    <SelectItem key={p.id.toString()} textValue={`${p.name} (${p.sku})`}>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{p.name}</span>
+                                        <span className="text-xs text-default-500">
+                                          {p.sku} • {p.barcode}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </Select>
+                              </div>
+                              <div className="w-24">
+                                <Input
+                                  label="Qty"
+                                  type="number"
+                                  size="sm"
+                                  value={item.quantity}
+                                  onChange={(e) => updateBarcodeProduct(index, 'quantity', e.target.value)}
+                                  min={1}
+                                  max={100}
+                                />
+                              </div>
+                              {barcodeFormData.products.length > 1 && (
+                                <Button
+                                  isIconOnly
+                                  size="sm"
+                                  variant="flat"
+                                  color="danger"
+                                  onPress={() => removeBarcodeProduct(index)}
+                                  className="mt-6"
+                                >
+                                  ✕
+                                </Button>
+                              )}
+                            </div>
+                            {product && (
+                              <div className="flex justify-between items-center text-sm bg-white p-2 rounded-lg">
+                                <div className="flex gap-4">
+                                  <span className="text-default-500">SKU: <span className="text-default-700">{product.sku}</span></span>
+                                  <span className="text-default-500">Barcode: <span className="font-mono text-default-700">{product.barcode}</span></span>
+                                </div>
+                                <span className="font-semibold text-primary">PHP {parseFloat(product.selling_price).toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </CardBody>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* Summary */}
+                {barcodeFormData.products.some(p => p.productId) && (
+                  <Card className="bg-primary-50">
+                    <CardBody className="p-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold text-primary">Total Labels</p>
+                          <p className="text-sm text-default-600">
+                            {barcodeFormData.products.filter(p => getProductById(p.productId)?.barcode).length} product(s)
+                          </p>
+                        </div>
+                        <p className="text-2xl font-bold text-primary">
+                          {barcodeFormData.products.reduce((sum, p) => {
+                            const product = getProductById(p.productId);
+                            if (product?.barcode) {
+                              return sum + (parseInt(p.quantity) || 0);
+                            }
+                            return sum;
+                          }, 0)}
+                        </p>
+                      </div>
+                    </CardBody>
+                  </Card>
+                )}
+
+                <div className="bg-default-100 p-3 rounded-lg">
+                  <p className="text-sm text-default-600">
+                    <strong>Label Size:</strong> 60mm x 30mm (standard barcode label)
+                  </p>
+                  <p className="text-sm text-default-600">
+                    <strong>Layout:</strong> 3 labels per row, 8 rows per page (A4)
+                  </p>
+                  <p className="text-sm text-default-600">
+                    <strong>Includes:</strong> Barcode, product name, SKU, and price (PHP)
+                  </p>
+                </div>
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={onBarcodeClose}>
+                Cancel
+              </Button>
+              <Button 
+                color="primary" 
+                onPress={generateBarcodePDF}
+                isLoading={isGenerating}
+                isDisabled={!barcodeFormData.products.some(p => getProductById(p.productId)?.barcode && parseInt(p.quantity) > 0)}
+              >
+                Generate PDF
               </Button>
             </ModalFooter>
           </ModalContent>

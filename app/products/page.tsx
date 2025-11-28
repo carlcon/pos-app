@@ -129,35 +129,6 @@ function ProductsContent() {
     onOpen();
   }, [onOpen]);
 
-  const handleDelete = useCallback(async (id: number) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      try {
-        setError(null);
-        console.log('Deleting product:', id);
-        await api.delete(`/inventory/products/${id}/`);
-        console.log('Product deleted successfully');
-        addToast({
-          title: 'Product Deleted',
-          description: 'The product has been successfully deleted.',
-          color: 'success',
-        });
-        await fetchProducts();
-      } catch (err) {
-        console.error('Delete error:', err);
-        const error = err as { response?: { data?: { message?: string; detail?: string } } };
-        const errorMessage = error.response?.data?.message || 
-                            error.response?.data?.detail ||
-                            'Failed to delete product. It may be referenced in sales or purchase orders.';
-        setError(errorMessage);
-        addToast({
-          title: 'Delete Failed',
-          description: errorMessage,
-          color: 'danger',
-        });
-      }
-    }
-  }, []);
-
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
       {
@@ -238,24 +209,16 @@ function ProductsContent() {
         id: 'actions',
         header: 'Actions',
         cell: ({ row }) => (
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleEdit(row.original)}
-              className="px-4 py-2 text-sm font-medium text-[#049AE0] bg-white border border-[#049AE0] rounded-lg hover:bg-[#049AE0] hover:text-white transition-colors duration-200"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => handleDelete(row.original.id)}
-              className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-600 hover:text-white transition-colors duration-200"
-            >
-              Delete
-            </button>
-          </div>
+          <button
+            onClick={() => handleEdit(row.original)}
+            className="px-4 py-2 text-sm font-medium text-[#049AE0] bg-white border border-[#049AE0] rounded-lg hover:bg-[#049AE0] hover:text-white transition-colors duration-200"
+          >
+            Edit
+          </button>
         ),
       },
     ],
-    [handleEdit, handleDelete]
+    [handleEdit]
   );
 
   const table = useReactTable({
@@ -655,17 +618,6 @@ function ProductsContent() {
                   onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
                   startContent={<span className="text-default-400">₱</span>}
                   placeholder="0.00 (optional)"
-                  classNames={{
-                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
-                  }}
-                />
-                <Input
-                  label="Stock Quantity"
-                  type="number"
-                  value={formData.current_stock}
-                  onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
-                  isRequired
-                  placeholder="Current stock"
                   classNames={{
                     inputWrapper: "border-gray-200 hover:border-[#049AE0]"
                   }}
