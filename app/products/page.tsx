@@ -50,6 +50,7 @@ function ProductsContent() {
     description: '',
     cost_price: '',
     selling_price: '',
+    wholesale_price: '',
     current_stock: '',
     minimum_stock_level: '',
     unit_of_measure: 'PIECE',
@@ -119,6 +120,7 @@ function ProductsContent() {
       description: product.description || '',
       cost_price: product.cost_price,
       selling_price: product.selling_price,
+      wholesale_price: product.wholesale_price || '',
       current_stock: product.current_stock.toString(),
       minimum_stock_level: product.minimum_stock_level.toString(),
       unit_of_measure: product.unit_of_measure,
@@ -188,10 +190,22 @@ function ProductsContent() {
       },
       {
         accessorKey: 'selling_price',
-        header: 'Price',
+        header: 'Retail Price',
         cell: ({ row }) => (
           <span className="font-semibold text-[#242832]">
             ₱{parseFloat(row.original.selling_price).toFixed(2)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'wholesale_price',
+        header: 'Wholesale Price',
+        cell: ({ row }) => (
+          <span className="font-semibold text-[#242832]">
+            {row.original.wholesale_price 
+              ? `₱${parseFloat(row.original.wholesale_price).toFixed(2)}`
+              : <span className="text-default-400">—</span>
+            }
           </span>
         ),
       },
@@ -267,6 +281,7 @@ function ProductsContent() {
       description: '',
       cost_price: '',
       selling_price: '',
+      wholesale_price: '',
       current_stock: '0',
       minimum_stock_level: '10',
       unit_of_measure: 'PIECE',
@@ -297,6 +312,7 @@ function ProductsContent() {
         minimum_stock_level: parseInt(formData.minimum_stock_level) || 10,
         barcode: formData.barcode || null,
         description: formData.description || '',
+        wholesale_price: formData.wholesale_price || null,
       };
 
       console.log('Submitting product data:', data);
@@ -613,7 +629,7 @@ function ProductsContent() {
                   type="number"
                   value={formData.cost_price}
                   onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                  startContent={<span className="text-default-400">$</span>}
+                  startContent={<span className="text-default-400">₱</span>}
                   isRequired
                   placeholder="0.00"
                   classNames={{
@@ -625,9 +641,20 @@ function ProductsContent() {
                   type="number"
                   value={formData.selling_price}
                   onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                  startContent={<span className="text-default-400">$</span>}
+                  startContent={<span className="text-default-400">₱</span>}
                   isRequired
                   placeholder="0.00"
+                  classNames={{
+                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
+                  }}
+                />
+                <Input
+                  label="Wholesale Price"
+                  type="number"
+                  value={formData.wholesale_price}
+                  onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
+                  startContent={<span className="text-default-400">₱</span>}
+                  placeholder="0.00 (optional)"
                   classNames={{
                     inputWrapper: "border-gray-200 hover:border-[#049AE0]"
                   }}

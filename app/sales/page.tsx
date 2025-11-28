@@ -17,6 +17,7 @@ import {
   ModalFooter,
   useDisclosure,
   addToast,
+  Switch,
 } from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
@@ -27,6 +28,7 @@ import type { Product } from '@/types';
 interface CartItem {
   product: Product;
   quantity: number;
+  unitPrice: number;
   subtotal: number;
 }
 
@@ -37,6 +39,7 @@ function POSContent() {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER'>('CASH');
+  const [isWholesale, setIsWholesale] = useState(false);
   const [searching, setSearching] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -47,6 +50,14 @@ function POSContent() {
   useEffect(() => {
     barcodeRef.current?.focus();
   }, [cart]);
+
+  // Get the appropriate price based on wholesale mode
+  const getProductPrice = (product: Product): number => {
+    if (isWholesale && product.wholesale_price) {
+      return parseFloat(product.wholesale_price);
+    }
+    return parseFloat(product.selling_price);
+  };
 
   const handleBarcodeSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && barcodeInput.trim()) {
@@ -68,6 +79,7 @@ function POSContent() {
   };
 
   const addToCart = (product: Product, qty: number = 1) => {
+    const unitPrice = getProductPrice(product);
     const existingItem = cart.find((item) => item.product.id === product.id);
 
     if (existingItem) {
@@ -77,7 +89,7 @@ function POSContent() {
             ? {
                 ...item,
                 quantity: item.quantity + qty,
-                subtotal: (item.quantity + qty) * parseFloat(product.selling_price),
+                subtotal: (item.quantity + qty) * item.unitPrice,
               }
             : item
         )
@@ -88,7 +100,8 @@ function POSContent() {
         {
           product,
           quantity: qty,
-          subtotal: qty * parseFloat(product.selling_price),
+          unitPrice,
+          subtotal: qty * unitPrice,
         },
       ]);
     }
@@ -106,12 +119,29 @@ function POSContent() {
           ? {
               ...item,
               quantity,
-              subtotal: quantity * parseFloat(item.product.selling_price),
+              subtotal: quantity * item.unitPrice,
             }
           : item
       )
     );
   };
+
+  // Update cart prices when switching between wholesale and retail
+  useEffect(() => {
+    if (cart.length > 0) {
+      setCart(
+        cart.map((item) => {
+          const newPrice = getProductPrice(item.product);
+          return {
+            ...item,
+            unitPrice: newPrice,
+            subtotal: item.quantity * newPrice,
+          };
+        })
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWholesale]);
 
   const removeFromCart = (productId: number) => {
     setCart(cart.filter((item) => item.product.id !== productId));
@@ -134,10 +164,11 @@ function POSContent() {
     const saleData = {
       customer_name: customerName || undefined,
       payment_method: paymentMethod,
+      is_wholesale: isWholesale,
       items: cart.map((item) => ({
         product: item.product.id,
         quantity: item.quantity,
-        unit_price: item.product.selling_price,
+        unit_price: item.unitPrice.toString(),
       })),
     };
 
@@ -148,7 +179,7 @@ function POSContent() {
         setLastSaleTotal(total); // Save total before clearing cart
         addToast({
           title: 'Sale Completed',
-          description: `Sale ${sale.sale_number} processed successfully`,
+          description: `Sale ${sale.sale_number} processed successfully${isWholesale ? ' (Wholesale)' : ''}`,
           color: 'success',
         });
         onOpen();
@@ -156,6 +187,7 @@ function POSContent() {
         setCart([]);
         setCustomerName('');
         setPaymentMethod('CASH');
+        setIsWholesale(false);
       }
     } catch (err) {
       console.error('Checkout error:', err);
@@ -188,9 +220,21 @@ function POSContent() {
             <h1 className="text-2xl sm:text-3xl xl:text-4xl font-bold text-foreground">Point of Sale</h1>
             <p className="text-sm sm:text-base xl:text-lg text-default-500 mt-1">Scan products or search to add to cart</p>
           </div>
-          <Chip color="success" variant="flat" size="lg" className="w-fit">
-            Items: {cart.reduce((sum, item) => sum + item.quantity, 0)}
-          </Chip>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                isSelected={isWholesale}
+                onValueChange={setIsWholesale}
+                color="warning"
+              />
+              <span className={`text-sm font-medium ${isWholesale ? 'text-warning' : 'text-default-500'}`}>
+                {isWholesale ? 'Wholesale' : 'Retail'}
+              </span>
+            </div>
+            <Chip color="success" variant="flat" size="lg" className="w-fit">
+              Items: {cart.reduce((sum, item) => sum + item.quantity, 0)}
+            </Chip>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 xl:gap-8">
@@ -232,7 +276,10 @@ function POSContent() {
                         <div className="flex-1">
                           <p className="font-medium">{item.product.name}</p>
                           <p className="text-xs text-default-500">
-                            {item.product.sku} • ₱{parseFloat(item.product.selling_price).toFixed(2)}
+                            {item.product.sku} • ₱{item.unitPrice.toFixed(2)}
+                            {isWholesale && item.product.wholesale_price && (
+                              <span className="ml-1 text-warning">(Wholesale)</span>
+                            )}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">

@@ -44,6 +44,7 @@ export interface Product {
   unit_of_measure: 'PIECE' | 'BOX' | 'SET' | 'PAIR' | 'LITER' | 'KG' | 'METER';
   cost_price: string;
   selling_price: string;
+  wholesale_price?: string;
   minimum_stock_level: number;
   current_stock: number;
   barcode?: string;
@@ -118,6 +119,7 @@ export interface Sale {
   sale_number: string;
   customer_name?: string;
   payment_method: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHECK' | 'CREDIT';
+  is_wholesale: boolean;
   subtotal: string;
   discount: string;
   total_amount: string;
