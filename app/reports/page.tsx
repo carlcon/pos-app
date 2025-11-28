@@ -154,7 +154,7 @@ function ReportsContent() {
                 <p className="text-xs text-default-500 capitalize">{key.replace(/_/g, ' ')}</p>
                 <p className="text-lg font-semibold">
                   {typeof value === 'number' 
-                    ? key.includes('revenue') || key.includes('value') || key.includes('cost') || key.includes('total') && !key.includes('count')
+                    ? (key.includes('revenue') || key.includes('value') || key.includes('cost') || key.includes('price') || key.includes('profit')) && !key.includes('count') && !key.includes('quantity') && !key.includes('units') && !key.includes('products')
                       ? `₱${value.toFixed(2)}`
                       : key.includes('percentage')
                         ? `${value.toFixed(1)}%`
@@ -206,7 +206,7 @@ function ReportsContent() {
                               {String(item[col])}
                             </Chip>
                           ) : typeof item[col] === 'number' ? (
-                            col.includes('price') || col.includes('value') || col.includes('revenue') || col.includes('total') || col.includes('cost')
+                            (col.includes('price') || col.includes('value') || col.includes('revenue') || col.includes('cost') || col.includes('profit')) && !col.includes('count') && !col.includes('quantity') && !col.includes('stock') && !col.includes('units') && !col.includes('sold')
                               ? `₱${(item[col] as number).toFixed(2)}`
                               : col.includes('percentage')
                                 ? `${(item[col] as number).toFixed(1)}%`

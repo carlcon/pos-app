@@ -7,6 +7,7 @@ interface CreateStockAdjustment {
   adjustment_type: 'IN' | 'OUT' | 'ADJUSTMENT';
   reason: 'PURCHASE' | 'SALE' | 'DAMAGED' | 'LOST' | 'RECONCILIATION' | 'RETURN' | 'MANUAL';
   quantity: number;
+  unit_cost?: number;
   reference_number?: string;
   notes?: string;
 }

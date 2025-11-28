@@ -36,6 +36,7 @@ function StockContent() {
     transaction_type: 'IN' as TransactionType,
     reason: 'MANUAL' as ReasonType,
     quantity: '',
+    unit_cost: '',
     reference_number: '',
     notes: '',
   });
@@ -93,7 +94,15 @@ function StockContent() {
       return;
     }
     
-    const data = {
+    const data: {
+      product_id: number;
+      adjustment_type: TransactionType;
+      reason: ReasonType;
+      quantity: number;
+      unit_cost?: number;
+      reference_number?: string;
+      notes?: string;
+    } = {
       product_id: parseInt(formData.product),
       adjustment_type: formData.transaction_type,
       reason: formData.reason,
@@ -101,6 +110,11 @@ function StockContent() {
       reference_number: formData.reference_number || undefined,
       notes: formData.notes || undefined,
     };
+
+    // Only include unit_cost for IN transactions
+    if (formData.transaction_type === 'IN' && formData.unit_cost) {
+      data.unit_cost = parseFloat(formData.unit_cost);
+    }
 
     try {
       await createAdjustment(data);
@@ -114,6 +128,7 @@ function StockContent() {
         transaction_type: 'IN',
         reason: 'MANUAL',
         quantity: '',
+        unit_cost: '',
         reference_number: '',
         notes: '',
       });
@@ -243,6 +258,11 @@ function StockContent() {
                         {transaction.transaction_type === 'OUT' ? '-' : '+'}
                         {transaction.quantity}
                       </p>
+                      {transaction.transaction_type === 'IN' && transaction.unit_cost && (
+                        <p className="text-xs text-default-500">
+                          ₱{transaction.unit_cost}/unit • Total: ₱{transaction.total_cost}
+                        </p>
+                      )}
                       {transaction.reference_number && (
                         <p className="text-xs text-default-500">Ref: {transaction.reference_number}</p>
                       )}
@@ -263,7 +283,15 @@ function StockContent() {
                   label="Product"
                   placeholder="Select a product"
                   selectedKeys={formData.product ? [formData.product] : []}
-                  onChange={(e) => setFormData({ ...formData, product: e.target.value })}
+                  onChange={(e) => {
+                    const productId = e.target.value;
+                    const product = products?.find(p => p.id.toString() === productId);
+                    setFormData({ 
+                      ...formData, 
+                      product: productId,
+                      unit_cost: product?.cost_price || ''
+                    });
+                  }}
                   isRequired
                   renderValue={() => {
                     if (selectedProduct) {
@@ -317,6 +345,22 @@ function StockContent() {
                   isRequired
                   description={formData.transaction_type === 'ADJUSTMENT' ? 'This will set the stock to this exact amount' : undefined}
                 />
+
+                {formData.transaction_type === 'IN' && (
+                  <Input
+                    label="Unit Cost"
+                    type="number"
+                    value={formData.unit_cost}
+                    onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })}
+                    placeholder={selectedProduct?.cost_price ? `Current: ₱${selectedProduct.cost_price}` : 'Enter cost per unit'}
+                    startContent={<span className="text-default-400">₱</span>}
+                    description={
+                      formData.unit_cost && formData.quantity
+                        ? `Total cost: ₱${(parseFloat(formData.unit_cost) * parseInt(formData.quantity || '0')).toFixed(2)}`
+                        : 'Cost will update product\'s cost price if different'
+                    }
+                  />
+                )}
 
                 <Input
                   label="Reference Number"

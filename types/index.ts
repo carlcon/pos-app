@@ -141,6 +141,8 @@ export interface StockTransaction {
   quantity: number;
   quantity_before: number;
   quantity_after: number;
+  unit_cost?: string;
+  total_cost?: string;
   reference_number?: string;
   notes?: string;
   performed_by: number;
