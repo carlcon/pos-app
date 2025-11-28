@@ -63,10 +63,10 @@ function ProductsContent() {
       setLoading(true);
       setError(null);
       const response = await api.get('/inventory/products/');
-      const data = response.data as any;
-      setProducts(data.results || data);
+      const data = response.data as { results?: Product[] } | Product[];
+      setProducts(Array.isArray(data) ? data : data.results || []);
     } catch (err) {
-      const error = err as any;
+      const error = err as { response?: { data?: { message?: string } } };
       setError(error.response?.data?.message || 'Failed to fetch products');
       setProducts([]);
     } finally {
@@ -324,7 +324,7 @@ function ProductsContent() {
         if (response.data) {
           setGlobalFilter(response.data.name);
         }
-      } catch (error) {
+      } catch {
         alert('Product not found');
       }
       setBarcodeSearch('');
@@ -400,12 +400,13 @@ function ProductsContent() {
                 value: "text-sm"
               }}
             >
-              <SelectItem key="all">All Categories</SelectItem>
-              {categories?.map((cat) => (
-                <SelectItem key={cat.id.toString()}>
-                  {cat.name}
-                </SelectItem>
-              ))}
+              {[<SelectItem key="all">All Categories</SelectItem>].concat(
+                categories?.map((cat) => (
+                  <SelectItem key={cat.id.toString()}>
+                    {cat.name}
+                  </SelectItem>
+                )) || []
+              )}
             </Select>
             <Select
               placeholder="Status"
