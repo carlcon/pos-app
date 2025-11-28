@@ -155,7 +155,7 @@ function ReportsContent() {
                 <p className="text-lg font-semibold">
                   {typeof value === 'number' 
                     ? key.includes('revenue') || key.includes('value') || key.includes('cost') || key.includes('total') && !key.includes('count')
-                      ? `$${value.toFixed(2)}`
+                      ? `₱${value.toFixed(2)}`
                       : key.includes('percentage')
                         ? `${value.toFixed(1)}%`
                         : value.toLocaleString()
@@ -207,7 +207,7 @@ function ReportsContent() {
                             </Chip>
                           ) : typeof item[col] === 'number' ? (
                             col.includes('price') || col.includes('value') || col.includes('revenue') || col.includes('total') || col.includes('cost')
-                              ? `$${(item[col] as number).toFixed(2)}`
+                              ? `₱${(item[col] as number).toFixed(2)}`
                               : col.includes('percentage')
                                 ? `${(item[col] as number).toFixed(1)}%`
                                 : (item[col] as number).toLocaleString()
@@ -353,7 +353,7 @@ function ReportsContent() {
                 <div className="flex justify-between p-3 bg-default-50 rounded">
                   <span className="text-default-600">Today&apos;s Sales:</span>
                   <span className="font-semibold">
-                    ${stats ? parseFloat(stats.today_sales.total).toFixed(2) : '0.00'}
+                    ₱{stats ? parseFloat(stats.today_sales.total).toFixed(2) : '0.00'}
                   </span>
                 </div>
                 <div className="flex justify-between p-3 bg-default-50 rounded">
@@ -369,7 +369,7 @@ function ReportsContent() {
                 <div className="flex justify-between p-3 bg-default-50 rounded">
                   <span className="text-default-600">Inventory Value:</span>
                   <span className="font-semibold text-success">
-                    ${stats ? parseFloat(stats.total_inventory_value.value).toFixed(2) : '0.00'}
+                    ₱{stats ? parseFloat(stats.total_inventory_value.value).toFixed(2) : '0.00'}
                   </span>
                 </div>
               </div>

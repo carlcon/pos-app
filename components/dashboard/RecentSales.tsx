@@ -48,7 +48,7 @@ export default function RecentSales({ sales }: RecentSalesProps) {
                 {sale.payment_method}
               </span>
               <p className="font-bold text-sm min-w-[70px] sm:min-w-[80px] text-right text-[#242832]">
-                ${sale.total_amount.toLocaleString()}
+                ₱{sale.total_amount.toLocaleString()}
               </p>
             </div>
           </div>

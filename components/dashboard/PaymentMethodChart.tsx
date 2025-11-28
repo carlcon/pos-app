@@ -25,7 +25,7 @@ export default function PaymentMethodChart({ data }: PaymentMethodChartProps) {
     value: item.total
   }));
 
-  const formatCurrency = (value: number) => `$${value.toLocaleString()}`;
+  const formatCurrency = (value: number) => `₱${value.toLocaleString()}`;
 
   return (
     <div>

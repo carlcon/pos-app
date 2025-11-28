@@ -30,7 +30,7 @@ export default function TopProducts({ products }: TopProductsProps) {
               </div>
             </div>
             <Chip className="bg-[#049AE0]/10 text-[#049AE0] ml-2 flex-shrink-0" variant="flat" size="sm">
-              ${product.total_revenue.toLocaleString()}
+              ₱{product.total_revenue.toLocaleString()}
             </Chip>
           </div>
         ))

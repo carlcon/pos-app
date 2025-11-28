@@ -7,7 +7,7 @@ interface RevenueChartProps {
 }
 
 export default function RevenueChart({ data }: RevenueChartProps) {
-  const formatCurrency = (value: number) => `$${value.toLocaleString()}`;
+  const formatCurrency = (value: number) => `₱${value.toLocaleString()}`;
   
   const formatMonth = (month: string) => {
     const date = new Date(month);

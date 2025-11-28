@@ -232,7 +232,7 @@ function POSContent() {
                         <div className="flex-1">
                           <p className="font-medium">{item.product.name}</p>
                           <p className="text-xs text-default-500">
-                            {item.product.sku} • ${parseFloat(item.product.selling_price).toFixed(2)}
+                            {item.product.sku} • ₱{parseFloat(item.product.selling_price).toFixed(2)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -254,7 +254,7 @@ function POSContent() {
                           </Button>
                         </div>
                         <div className="w-24 text-right font-semibold">
-                          ${item.subtotal.toFixed(2)}
+                          ₱{item.subtotal.toFixed(2)}
                         </div>
                         <Button
                           size="sm"
@@ -300,11 +300,11 @@ function POSContent() {
                 <div className="border-t pt-4 space-y-2">
                   <div className="flex justify-between text-lg">
                     <span>Subtotal:</span>
-                    <span className="font-semibold">${total.toFixed(2)}</span>
+                    <span className="font-semibold">₱{total.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-2xl font-bold text-primary">
                     <span>Total:</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>₱{total.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -353,7 +353,7 @@ function POSContent() {
               <div className="text-6xl mb-4">✓</div>
               <h3 className="text-2xl font-bold mb-2">Transaction Successful</h3>
               <p className="text-default-500">Sale Number: {lastSaleNumber}</p>
-              <p className="text-3xl font-bold text-primary mt-4">${lastSaleTotal.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-primary mt-4">₱{lastSaleTotal.toFixed(2)}</p>
             </ModalBody>
             <ModalFooter>
               <Button color="primary" onPress={handleNewSale} className="w-full">

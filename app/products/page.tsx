@@ -191,7 +191,7 @@ function ProductsContent() {
         header: 'Price',
         cell: ({ row }) => (
           <span className="font-semibold text-[#242832]">
-            ${parseFloat(row.original.selling_price).toFixed(2)}
+            ₱{parseFloat(row.original.selling_price).toFixed(2)}
           </span>
         ),
       },

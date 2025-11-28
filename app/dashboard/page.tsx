@@ -71,7 +71,7 @@ function DashboardContent() {
           <div className="bg-white rounded-xl p-4 sm:p-6 xl:p-8 shadow-sm border border-gray-100">
             <p className="text-xs xl:text-sm font-semibold text-[#049AE0] uppercase tracking-wide mb-2">Today&apos;s Sales</p>
             <p className="text-2xl sm:text-3xl xl:text-4xl font-bold text-[#242832] mb-1">
-              ${parseFloat(stats.today_sales.total).toLocaleString()}
+              ₱{parseFloat(stats.today_sales.total).toLocaleString()}
             </p>
             <p className="text-xs text-default-400">
               {stats.today_sales.count} transactions
@@ -81,7 +81,7 @@ function DashboardContent() {
           <div className="bg-white rounded-xl p-4 sm:p-6 xl:p-8 shadow-sm border border-gray-100">
             <p className="text-xs xl:text-sm font-semibold text-[#049AE0] uppercase tracking-wide mb-2">Revenue</p>
             <p className="text-2xl sm:text-3xl xl:text-4xl font-bold text-[#242832] mb-1">
-              ${(stats.monthly_revenue.slice(-1)[0]?.revenue || 0).toLocaleString()}
+              ₱{(stats.monthly_revenue.slice(-1)[0]?.revenue || 0).toLocaleString()}
             </p>
             <p className="text-xs text-default-400">This month</p>
           </div>
@@ -89,7 +89,7 @@ function DashboardContent() {
           <div className="bg-white rounded-xl p-4 sm:p-6 xl:p-8 shadow-sm border border-gray-100">
             <p className="text-xs xl:text-sm font-semibold text-[#049AE0] uppercase tracking-wide mb-2">Inventory Value</p>
             <p className="text-2xl sm:text-3xl xl:text-4xl font-bold text-[#242832] mb-1">
-              ${parseFloat(stats.total_inventory_value.value).toLocaleString()}
+              ₱{parseFloat(stats.total_inventory_value.value).toLocaleString()}
             </p>
             <p className="text-xs text-default-400">{stats.stock_summary.total_products} products</p>
           </div>
