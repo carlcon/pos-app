@@ -348,6 +348,46 @@ function ReportsContent() {
 
           <Card>
             <CardBody className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Expense Reports</h3>
+              <div className="space-y-3">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('monthly-expenses', 'Monthly Expenses Analysis')}
+                  isLoading={reportLoading && currentReport === 'Monthly Expenses Analysis'}
+                >
+                  📊 Monthly Expenses Analysis
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('expenses-by-category', 'Expenses by Category')}
+                  isLoading={reportLoading && currentReport === 'Expenses by Category'}
+                >
+                  📂 Expenses by Category
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('expenses-by-vendor', 'Expenses by Vendor')}
+                  isLoading={reportLoading && currentReport === 'Expenses by Vendor'}
+                >
+                  🏢 Expenses by Vendor
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('expense-transactions', 'Expense Transactions')}
+                  isLoading={reportLoading && currentReport === 'Expense Transactions'}
+                >
+                  📋 Expense Transactions
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-6">
               <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
               <div className="space-y-3">
                 <div className="flex justify-between p-3 bg-default-50 rounded">

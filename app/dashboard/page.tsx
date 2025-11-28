@@ -4,6 +4,7 @@ import { Spinner } from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useDashboard } from '@/hooks/useDashboard';
+import { useExpenseStats } from '@/hooks/useExpenses';
 import SalesChart from '@/components/dashboard/SalesChart';
 import RevenueChart from '@/components/dashboard/RevenueChart';
 import TopProducts from '@/components/dashboard/TopProducts';
@@ -13,6 +14,7 @@ import PaymentMethodChart from '@/components/dashboard/PaymentMethodChart';
 
 function DashboardContent() {
   const { stats, loading, error } = useDashboard();
+  const { stats: expenseStats, loading: expenseLoading } = useExpenseStats();
 
   if (loading) {
     return (
@@ -149,6 +151,51 @@ function DashboardContent() {
             }))} />
           </div>
         </div>
+
+        {/* Expenses Trend Row */}
+        {!expenseLoading && expenseStats && expenseStats.monthly_trend.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 xl:p-8">
+            <h3 className="text-base sm:text-lg xl:text-xl font-bold text-[#242832] mb-3 sm:mb-4 xl:mb-6">Monthly Expenses Trend</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="p-3 bg-red-50 rounded-lg">
+                <p className="text-xs text-red-600 font-medium">Total Expenses</p>
+                <p className="text-lg sm:text-xl font-bold text-red-700">₱{expenseStats.total_expenses.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-red-50 rounded-lg">
+                <p className="text-xs text-red-600 font-medium">This Month</p>
+                <p className="text-lg sm:text-xl font-bold text-red-700">₱{expenseStats.this_month_total.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-red-50 rounded-lg">
+                <p className="text-xs text-red-600 font-medium">Last Month</p>
+                <p className="text-lg sm:text-xl font-bold text-red-700">₱{expenseStats.last_month_total.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-red-50 rounded-lg">
+                <p className="text-xs text-red-600 font-medium">Today</p>
+                <p className="text-lg sm:text-xl font-bold text-red-700">₱{expenseStats.today_total.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {expenseStats.monthly_trend.map((month, idx) => {
+                const maxTotal = Math.max(...expenseStats.monthly_trend.map(m => m.total), 1);
+                const percentage = (month.total / maxTotal) * 100;
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-default-600">{month.month}</span>
+                      <span className="font-medium text-red-600">₱{month.total.toLocaleString()}</span>
+                    </div>
+                    <div className="w-full bg-default-100 rounded-full h-2">
+                      <div 
+                        className="bg-red-500 h-2 rounded-full transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Bottom Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 xl:gap-8">

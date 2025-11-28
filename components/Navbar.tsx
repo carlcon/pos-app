@@ -22,6 +22,7 @@ export function Navbar() {
     { href: '/products', label: 'Products', icon: '📦' },
     { href: '/sales', label: 'Sales', icon: '💰' },
     { href: '/stock', label: 'Stock', icon: '📋' },
+    { href: '/expenses', label: 'Expenses', icon: '💸' },
   ];
 
   const adminLinks = [
