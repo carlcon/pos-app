@@ -1,12 +1,236 @@
 'use client';
 
-import { Card, CardBody, Button } from '@heroui/react';
+import { useState } from 'react';
+import {
+  Card,
+  CardBody,
+  Button,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+  Spinner,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip,
+  addToast,
+} from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useDashboard } from '@/hooks/useDashboard';
+import api from '@/lib/api';
+
+interface ReportData {
+  report_type: string;
+  [key: string]: unknown;
+}
 
 function ReportsContent() {
   const { stats } = useDashboard();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [currentReport, setCurrentReport] = useState('');
+
+  const fetchReport = async (endpoint: string, reportName: string) => {
+    setReportLoading(true);
+    setCurrentReport(reportName);
+    try {
+      const response = await api.get(`/dashboard/reports/${endpoint}/`);
+      setReportData(response.data as ReportData);
+      onOpen();
+    } catch (error) {
+      console.error('Error fetching report:', error);
+      addToast({
+        title: 'Error',
+        description: 'Failed to fetch report data',
+        color: 'danger',
+      });
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const exportToCSV = () => {
+    if (!reportData) return;
+
+    let csvContent = '';
+    const reportType = reportData.report_type || 'Report';
+
+    // Add header
+    csvContent += `${reportType}\n`;
+    csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
+
+    // Add summary if exists
+    if (reportData.summary && typeof reportData.summary === 'object') {
+      csvContent += 'Summary\n';
+      Object.entries(reportData.summary as Record<string, unknown>).forEach(([key, value]) => {
+        csvContent += `${key.replace(/_/g, ' ')},${value}\n`;
+      });
+      csvContent += '\n';
+    }
+
+    // Find array data to export
+    const arrayKeys = Object.keys(reportData).filter(
+      key => Array.isArray(reportData[key]) && (reportData[key] as unknown[]).length > 0
+    );
+
+    arrayKeys.forEach(key => {
+      const items = reportData[key] as Record<string, unknown>[];
+      if (items.length > 0) {
+        csvContent += `${key.replace(/_/g, ' ').toUpperCase()}\n`;
+        
+        // Headers
+        const headers = Object.keys(items[0]);
+        csvContent += headers.join(',') + '\n';
+        
+        // Data rows
+        items.forEach(item => {
+          const row = headers.map(h => {
+            const val = item[h];
+            if (typeof val === 'string' && val.includes(',')) {
+              return `"${val}"`;
+            }
+            return val;
+          });
+          csvContent += row.join(',') + '\n';
+        });
+        csvContent += '\n';
+      }
+    });
+
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${reportType.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+
+    addToast({
+      title: 'Export Successful',
+      description: 'CSV file has been downloaded',
+      color: 'success',
+    });
+  };
+
+  const exportToJSON = () => {
+    if (!reportData) return;
+
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${(reportData.report_type || 'Report').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+
+    addToast({
+      title: 'Export Successful',
+      description: 'JSON file has been downloaded',
+      color: 'success',
+    });
+  };
+
+  const printReport = () => {
+    window.print();
+  };
+
+  const renderReportContent = () => {
+    if (!reportData) return null;
+
+    const summary = reportData.summary as Record<string, unknown> | undefined;
+
+    return (
+      <div className="space-y-6 print:space-y-4">
+        {/* Summary */}
+        {summary && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(summary).map(([key, value]) => (
+              <div key={key} className="bg-default-100 p-4 rounded-lg">
+                <p className="text-xs text-default-500 capitalize">{key.replace(/_/g, ' ')}</p>
+                <p className="text-lg font-semibold">
+                  {typeof value === 'number' 
+                    ? key.includes('revenue') || key.includes('value') || key.includes('cost') || key.includes('total') && !key.includes('count')
+                      ? `$${value.toFixed(2)}`
+                      : key.includes('percentage')
+                        ? `${value.toFixed(1)}%`
+                        : value.toLocaleString()
+                    : String(value)
+                  }
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Data Tables */}
+        {Object.entries(reportData).map(([key, value]) => {
+          if (!Array.isArray(value) || value.length === 0) return null;
+          if (key === 'report_type' || key === 'summary') return null;
+
+          const items = value as Record<string, unknown>[];
+          const columns = Object.keys(items[0]).filter(col => 
+            !col.includes('id') || col === 'id'
+          ).slice(0, 8); // Limit columns for display
+
+          return (
+            <div key={key} className="overflow-x-auto">
+              <h4 className="text-sm font-semibold mb-2 capitalize">{key.replace(/_/g, ' ')}</h4>
+              <Table aria-label={key} isStriped>
+                <TableHeader>
+                  {columns.map(col => (
+                    <TableColumn key={col} className="capitalize text-xs">
+                      {col.replace(/_/g, ' ')}
+                    </TableColumn>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {items.slice(0, 50).map((item, idx) => (
+                    <TableRow key={idx}>
+                      {columns.map(col => (
+                        <TableCell key={col} className="text-sm">
+                          {col === 'status' ? (
+                            <Chip
+                              size="sm"
+                              color={
+                                item[col] === 'OK' ? 'success' :
+                                item[col] === 'Low Stock' ? 'warning' :
+                                item[col] === 'Out of Stock' ? 'danger' : 'default'
+                              }
+                              variant="flat"
+                            >
+                              {String(item[col])}
+                            </Chip>
+                          ) : typeof item[col] === 'number' ? (
+                            col.includes('price') || col.includes('value') || col.includes('revenue') || col.includes('total') || col.includes('cost')
+                              ? `$${(item[col] as number).toFixed(2)}`
+                              : col.includes('percentage')
+                                ? `${(item[col] as number).toFixed(1)}%`
+                                : (item[col] as number).toLocaleString()
+                          ) : (
+                            String(item[col] ?? '-')
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {items.length > 50 && (
+                <p className="text-xs text-default-500 mt-2">
+                  Showing 50 of {items.length} items. Export to see all data.
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -22,16 +246,36 @@ function ReportsContent() {
             <CardBody className="p-6">
               <h3 className="text-lg font-semibold mb-4">Sales Reports</h3>
               <div className="space-y-3">
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('daily-sales', 'Daily Sales Report')}
+                  isLoading={reportLoading && currentReport === 'Daily Sales Report'}
+                >
                   📊 Daily Sales Report
                 </Button>
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('weekly-sales', 'Weekly Sales Summary')}
+                  isLoading={reportLoading && currentReport === 'Weekly Sales Summary'}
+                >
                   📈 Weekly Sales Summary
                 </Button>
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('monthly-revenue', 'Monthly Revenue Analysis')}
+                  isLoading={reportLoading && currentReport === 'Monthly Revenue Analysis'}
+                >
                   📉 Monthly Revenue Analysis
                 </Button>
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('payment-breakdown', 'Payment Method Breakdown')}
+                  isLoading={reportLoading && currentReport === 'Payment Method Breakdown'}
+                >
                   💳 Payment Method Breakdown
                 </Button>
               </div>
@@ -42,16 +286,36 @@ function ReportsContent() {
             <CardBody className="p-6">
               <h3 className="text-lg font-semibold mb-4">Inventory Reports</h3>
               <div className="space-y-3">
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('stock-levels', 'Stock Levels Report')}
+                  isLoading={reportLoading && currentReport === 'Stock Levels Report'}
+                >
                   📦 Stock Levels Report
                 </Button>
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('low-stock', 'Low Stock Alert Report')}
+                  isLoading={reportLoading && currentReport === 'Low Stock Alert Report'}
+                >
                   ⚠️ Low Stock Alert Report
                 </Button>
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('stock-movement', 'Stock Movement History')}
+                  isLoading={reportLoading && currentReport === 'Stock Movement History'}
+                >
                   🔄 Stock Movement History
                 </Button>
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('inventory-valuation', 'Inventory Valuation')}
+                  isLoading={reportLoading && currentReport === 'Inventory Valuation'}
+                >
                   💰 Inventory Valuation
                 </Button>
               </div>
@@ -62,17 +326,21 @@ function ReportsContent() {
             <CardBody className="p-6">
               <h3 className="text-lg font-semibold mb-4">Product Reports</h3>
               <div className="space-y-3">
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('top-selling', 'Top Selling Products')}
+                  isLoading={reportLoading && currentReport === 'Top Selling Products'}
+                >
                   🏆 Top Selling Products
                 </Button>
-                <Button className="w-full" variant="flat">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="flat"
+                  onPress={() => fetchReport('products-by-category', 'Products by Category')}
+                  isLoading={reportLoading && currentReport === 'Products by Category'}
+                >
                   📦 Products by Category
-                </Button>
-                <Button className="w-full" variant="flat">
-                  💵 Profit Margin Analysis
-                </Button>
-                <Button className="w-full" variant="flat">
-                  🔍 Product Performance
                 </Button>
               </div>
             </CardBody>
@@ -109,22 +377,51 @@ function ReportsContent() {
           </Card>
         </div>
 
-        <Card className="border-2 border-primary">
-          <CardBody className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Export Options</h3>
-            <div className="flex gap-4">
-              <Button color="primary">
-                📄 Export to PDF
-              </Button>
-              <Button color="success">
-                📊 Export to Excel
-              </Button>
-              <Button color="secondary">
-                📋 Export to CSV
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+        {/* Report Modal */}
+        <Modal 
+          isOpen={isOpen} 
+          onClose={onClose} 
+          size="5xl" 
+          scrollBehavior="inside"
+          classNames={{
+            base: "max-h-[90vh]",
+            body: "py-6"
+          }}
+        >
+          <ModalContent>
+            <ModalHeader className="flex flex-col gap-1">
+              <span className="text-xl font-bold">{reportData?.report_type || 'Report'}</span>
+              <span className="text-sm font-normal text-default-500">
+                Generated: {new Date().toLocaleString()}
+              </span>
+            </ModalHeader>
+            <ModalBody>
+              {reportLoading ? (
+                <div className="flex justify-center py-12">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                renderReportContent()
+              )}
+            </ModalBody>
+            <ModalFooter className="border-t">
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="flat" onPress={onClose}>
+                  Close
+                </Button>
+                <Button color="primary" variant="flat" onPress={printReport}>
+                  🖨️ Print
+                </Button>
+                <Button color="success" onPress={exportToCSV}>
+                  📊 Export CSV
+                </Button>
+                <Button color="secondary" onPress={exportToJSON}>
+                  📋 Export JSON
+                </Button>
+              </div>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </div>
     </div>
   );
