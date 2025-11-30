@@ -30,7 +30,6 @@ export function Navbar() {
   ];
 
   const adminLinks = [
-    { href: '/users', label: 'Users', icon: '👥' },
     { href: '/reports', label: 'Reports', icon: '📈' },
   ];
   
