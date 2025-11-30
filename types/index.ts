@@ -1,3 +1,23 @@
+// Partner types
+export interface Partner {
+  id: number;
+  name: string;
+  code: string;
+  contact_email?: string;
+  contact_phone?: string;
+  address?: string;
+  is_active: boolean;
+  user_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PartnerMinimal {
+  id: number;
+  name: string;
+  code: string;
+}
+
 // User types
 export interface User {
   id: number;
@@ -10,6 +30,8 @@ export interface User {
   employee_id?: string;
   is_active_employee: boolean;
   is_active: boolean;
+  is_super_admin: boolean;
+  partner?: PartnerMinimal;
   date_joined: string;
   last_login?: string;
 }
@@ -20,6 +42,20 @@ export interface AuthTokens {
   expires_in: number;
   token_type: string;
   user: User;
+}
+
+export interface ImpersonationResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  impersonating: Partner;
+  message: string;
+}
+
+export interface ImpersonationStatus {
+  is_impersonating: boolean;
+  partner: Partner | null;
 }
 
 // Product & Category types
