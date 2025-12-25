@@ -1,6 +1,7 @@
 'use client';
 
 import { Spinner } from '@heroui/react';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useDashboard } from '@/hooks/useDashboard';
@@ -11,10 +12,48 @@ import TopProducts from '@/components/dashboard/TopProducts';
 import LowStockAlert from '@/components/dashboard/LowStockAlert';
 import RecentSales from '@/components/dashboard/RecentSales';
 import PaymentMethodChart from '@/components/dashboard/PaymentMethodChart';
+import { useAuth } from '@/context/AuthContext';
 
 function DashboardContent() {
-  const { stats, loading, error } = useDashboard();
-  const { stats: expenseStats, loading: expenseLoading } = useExpenseStats();
+  const { isSuperAdmin, isImpersonating } = useAuth();
+  const tenantEnabled = !(isSuperAdmin && !isImpersonating);
+
+  const { stats, loading, error } = useDashboard(tenantEnabled);
+  const { stats: expenseStats, loading: expenseLoading } = useExpenseStats(tenantEnabled);
+
+  if (!tenantEnabled) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-8">
+          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl p-8 shadow-lg">
+            <p className="text-sm uppercase tracking-wide text-white/80 mb-2">Super Admin Mode</p>
+            <h1 className="text-3xl sm:text-4xl font-bold mb-3">Manage partners here</h1>
+            <p className="text-base sm:text-lg text-white/90">
+              Tenant data is hidden until you impersonate a partner. Choose a partner to view their dashboard and operations.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href="/partners"
+                className="inline-flex items-center px-5 py-3 rounded-lg bg-white text-purple-700 font-semibold shadow hover:shadow-md transition"
+              >
+                Go to Partners
+              </Link>
+              <div className="inline-flex items-center px-4 py-3 rounded-lg bg-white/10 text-white border border-white/20 text-sm">
+                Impersonate a partner from the partners page to explore their data.
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-3">
+            <h2 className="text-xl font-semibold text-gray-900">Why this view?</h2>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              Super admins can manage partners system-wide but must impersonate a partner to access tenant dashboards, sales, stock, or expenses. Pick a partner and start impersonation to continue.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

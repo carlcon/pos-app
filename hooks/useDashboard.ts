@@ -58,12 +58,18 @@ export interface DashboardStats {
   };
 }
 
-export function useDashboard() {
+export function useDashboard(enabled = true) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDashboard = useCallback(async () => {
+    if (!enabled) {
+      setStats(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -74,11 +80,17 @@ export function useDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setStats(null);
+      setLoading(false);
+      return;
+    }
+
     fetchDashboard();
-  }, [fetchDashboard]);
+  }, [enabled, fetchDashboard]);
 
   return {
     stats,

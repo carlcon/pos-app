@@ -38,6 +38,8 @@ export function Navbar() {
     { href: '/partners', label: 'Partners', icon: '🏢' },
   ];
 
+  const showTenantNav = !isSuperAdmin || isImpersonating;
+
   return (
     <>
       {/* Impersonation Banner */}
@@ -74,7 +76,7 @@ export function Navbar() {
 
               {/* Desktop Navigation */}
               <div className="hidden lg:flex items-center gap-1">
-                {navLinks.map((link) => (
+                {showTenantNav && navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -88,7 +90,7 @@ export function Navbar() {
                     {link.label}
                   </Link>
                 ))}
-                {user?.role === 'ADMIN' && adminLinks.map((link) => (
+                {showTenantNav && user?.role === 'ADMIN' && adminLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -186,7 +188,7 @@ export function Navbar() {
           {mobileMenuOpen && (
             <div className="lg:hidden py-4 border-t border-gray-200">
               <div className="flex flex-col gap-1">
-                {navLinks.map((link) => (
+                {showTenantNav && navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -201,7 +203,7 @@ export function Navbar() {
                     {link.label}
                   </Link>
                 ))}
-                {user?.role === 'ADMIN' && adminLinks.map((link) => (
+                {showTenantNav && user?.role === 'ADMIN' && adminLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
