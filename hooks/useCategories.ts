@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Category } from '@/types';
 
-export function useCategories() {
+export function useCategories(storeId?: number | null) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -11,7 +11,9 @@ export function useCategories() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/inventory/categories/');
+      const params = new URLSearchParams();
+      if (storeId) params.append('store_id', storeId.toString());
+      const response = await api.get(`/inventory/categories/${params.toString() ? `?${params.toString()}` : ''}`);
       const data = response.data as any;
       // Handle both paginated and non-paginated responses
       setCategories(data.results || data);
@@ -21,7 +23,7 @@ export function useCategories() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [storeId]);
 
   useEffect(() => {
     fetchCategories();

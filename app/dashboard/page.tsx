@@ -13,13 +13,15 @@ import LowStockAlert from '@/components/dashboard/LowStockAlert';
 import RecentSales from '@/components/dashboard/RecentSales';
 import PaymentMethodChart from '@/components/dashboard/PaymentMethodChart';
 import { useAuth } from '@/context/AuthContext';
+import { useStore } from '@/context/StoreContext';
 
 function DashboardContent() {
   const { isSuperAdmin, isImpersonating } = useAuth();
+  const { selectedStoreId, selectedStore } = useStore();
   const tenantEnabled = !(isSuperAdmin && !isImpersonating);
 
-  const { stats, loading, error } = useDashboard(tenantEnabled);
-  const { stats: expenseStats, loading: expenseLoading } = useExpenseStats(tenantEnabled);
+  const { stats, loading, error } = useDashboard(tenantEnabled, selectedStoreId);
+  const { stats: expenseStats, loading: expenseLoading } = useExpenseStats(tenantEnabled, selectedStoreId);
 
   if (!tenantEnabled) {
     return (
@@ -96,7 +98,9 @@ function DashboardContent() {
         {/* Header Section */}
         <div className="space-y-2">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-[#242832]">Business Dashboard</h1>
-          <p className="text-sm sm:text-base xl:text-lg text-default-500">Track your sales, inventory, and performance — one day at a time.</p>
+          <p className="text-sm sm:text-base xl:text-lg text-default-500">
+            Track your sales, inventory, and performance — one day at a time{selectedStore ? ` (Store: ${selectedStore.name})` : ''}.
+          </p>
         </div>
 
         {/* Date Banner */}

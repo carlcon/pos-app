@@ -10,9 +10,10 @@ interface CreateStockAdjustment {
   unit_cost?: number;
   reference_number?: string;
   notes?: string;
+  store?: number;
 }
 
-export function useStock() {
+export function useStock(storeId?: number | null) {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,10 @@ export function useStock() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<PaginatedResponse<StockTransaction>>(`/stock/transactions/?page=${page}`);
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      if (storeId) params.append('store_id', storeId.toString());
+      const response = await api.get<PaginatedResponse<StockTransaction>>(`/stock/transactions/?${params.toString()}`);
       setTransactions(response.data.results);
       setTotalCount(response.data.count);
     } catch (err: any) {
@@ -31,14 +35,15 @@ export function useStock() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, storeId]);
 
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
 
   const createAdjustment = async (data: CreateStockAdjustment) => {
-    const response = await api.post<StockTransaction>('/stock/adjust/', data);
+    const payload = storeId ? { ...data, store: storeId } : data;
+    const response = await api.post<StockTransaction>('/stock/adjust/', payload);
     await fetchTransactions();
     return response.data;
   };

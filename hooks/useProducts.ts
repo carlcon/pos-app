@@ -9,7 +9,7 @@ interface UseProductsOptions {
   isActive?: boolean;
 }
 
-export function useProducts(options: UseProductsOptions = {}) {
+export function useProducts(options: UseProductsOptions = {}, storeId?: number | null) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +26,7 @@ export function useProducts(options: UseProductsOptions = {}) {
       if (options.category) params.append('category', options.category.toString());
       if (options.lowStock) params.append('low_stock', 'true');
       if (options.isActive !== undefined) params.append('is_active', options.isActive.toString());
+      if (storeId) params.append('store_id', storeId.toString());
       params.append('page', page.toString());
 
       const response = await api.get<PaginatedResponse<Product>>(`/inventory/products/?${params}`);
@@ -36,7 +37,7 @@ export function useProducts(options: UseProductsOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [options.search, options.category, options.lowStock, options.isActive, page]);
+  }, [options.search, options.category, options.lowStock, options.isActive, page, storeId]);
 
   useEffect(() => {
     fetchProducts();
@@ -60,7 +61,10 @@ export function useProducts(options: UseProductsOptions = {}) {
   };
 
   const lookupBarcode = async (barcode: string) => {
-    const response = await api.get<Product>(`/inventory/products/barcode/${barcode}/`);
+    const params = new URLSearchParams();
+    if (storeId) params.append('store_id', storeId.toString());
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await api.get<Product>(`/inventory/products/barcode/${barcode}/${suffix}`);
     return response.data;
   };
 

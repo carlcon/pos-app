@@ -58,7 +58,7 @@ export interface DashboardStats {
   };
 }
 
-export function useDashboard(enabled = true) {
+export function useDashboard(enabled = true, storeId?: number | null) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
@@ -73,14 +73,16 @@ export function useDashboard(enabled = true) {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<DashboardStats>('/dashboard/stats/');
+      const params = new URLSearchParams();
+      if (storeId) params.append('store_id', storeId.toString());
+      const response = await api.get<DashboardStats>(`/dashboard/stats/${params.toString() ? `?${params.toString()}` : ''}`);
       setStats(response.data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch dashboard data');
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, storeId]);
 
   useEffect(() => {
     if (!enabled) {

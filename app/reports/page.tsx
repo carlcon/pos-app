@@ -24,6 +24,7 @@ import {
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useDashboard } from '@/hooks/useDashboard';
+import { useStore } from '@/context/StoreContext';
 import api from '@/lib/api';
 
 interface ReportData {
@@ -32,7 +33,8 @@ interface ReportData {
 }
 
 function ReportsContent() {
-  const { stats } = useDashboard();
+  const { selectedStoreId } = useStore();
+  const { stats } = useDashboard(true, selectedStoreId);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -42,7 +44,9 @@ function ReportsContent() {
     setReportLoading(true);
     setCurrentReport(reportName);
     try {
-      const response = await api.get(`/dashboard/reports/${endpoint}/`);
+      const params = new URLSearchParams();
+      if (selectedStoreId) params.append('store_id', selectedStoreId.toString());
+      const response = await api.get(`/dashboard/reports/${endpoint}/${params.toString() ? `?${params.toString()}` : ''}`);
       setReportData(response.data as ReportData);
       onOpen();
     } catch (error) {

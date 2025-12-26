@@ -26,11 +26,13 @@ import {
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useCategories } from '@/hooks/useCategories';
+import { useStore } from '@/context/StoreContext';
 import type { Product } from '@/types';
 import api from '@/lib/api';
 
 function ProductsContent() {
-  const { categories, loading: categoriesLoading } = useCategories();
+  const { selectedStoreId } = useStore();
+  const { categories, loading: categoriesLoading } = useCategories(selectedStoreId);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,9 @@ function ProductsContent() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/inventory/products/');
+      const params = new URLSearchParams();
+      if (selectedStoreId) params.append('store_id', selectedStoreId.toString());
+      const response = await api.get(`/inventory/products/${params.toString() ? `?${params.toString()}` : ''}`);
       const data = response.data as { results?: Product[] } | Product[];
       setProducts(Array.isArray(data) ? data : data.results || []);
     } catch (err) {
@@ -76,7 +80,7 @@ function ProductsContent() {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [selectedStoreId]);
 
   // Filter products based on all filters
   const filteredProducts = useMemo(() => {

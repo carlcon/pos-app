@@ -84,7 +84,7 @@ interface PaginatedResponse<T> {
   results: T[];
 }
 
-export function useExpenses() {
+export function useExpenses(storeId?: number | null) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +105,7 @@ export function useExpenses() {
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.search) params.append('search', filters.search);
+      if (storeId) params.append('store_id', storeId.toString());
       
       const response = await api.get<PaginatedResponse<Expense>>(`/expenses/?${params.toString()}`);
       setExpenses(response.data.results);
@@ -115,20 +116,22 @@ export function useExpenses() {
     } finally {
       setLoading(false);
     }
-  }, [page, filters]);
+  }, [page, filters, storeId]);
 
   useEffect(() => {
     fetchExpenses();
   }, [fetchExpenses]);
 
   const createExpense = async (data: CreateExpense) => {
-    const response = await api.post<Expense>('/expenses/', data);
+    const payload = storeId ? { ...data, store: storeId } : data;
+    const response = await api.post<Expense>('/expenses/', payload);
     await fetchExpenses();
     return response.data;
   };
 
   const updateExpense = async (id: number, data: Partial<CreateExpense>) => {
-    const response = await api.patch<Expense>(`/expenses/${id}/`, data);
+    const payload = storeId ? { ...data, store: storeId } : data;
+    const response = await api.patch<Expense>(`/expenses/${id}/`, payload);
     await fetchExpenses();
     return response.data;
   };
@@ -154,7 +157,7 @@ export function useExpenses() {
   };
 }
 
-export function useExpenseCategories() {
+export function useExpenseCategories(storeId?: number | null) {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +166,9 @@ export function useExpenseCategories() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<PaginatedResponse<ExpenseCategory>>('/expenses/categories/');
+      const params = new URLSearchParams();
+      if (storeId) params.append('store_id', storeId.toString());
+      const response = await api.get<PaginatedResponse<ExpenseCategory>>(`/expenses/categories/${params.toString() ? `?${params.toString()}` : ''}`);
       setCategories(response.data.results);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -171,20 +176,22 @@ export function useExpenseCategories() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [storeId]);
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
 
   const createCategory = async (data: { name: string; description?: string; color?: string }) => {
-    const response = await api.post<ExpenseCategory>('/expenses/categories/', data);
+    const payload = storeId ? { ...data, store: storeId } : data;
+    const response = await api.post<ExpenseCategory>('/expenses/categories/', payload);
     await fetchCategories();
     return response.data;
   };
 
   const updateCategory = async (id: number, data: Partial<{ name: string; description: string; color: string; is_active: boolean }>) => {
-    const response = await api.patch<ExpenseCategory>(`/expenses/categories/${id}/`, data);
+    const payload = storeId ? { ...data, store: storeId } : data;
+    const response = await api.patch<ExpenseCategory>(`/expenses/categories/${id}/`, payload);
     await fetchCategories();
     return response.data;
   };
@@ -205,7 +212,7 @@ export function useExpenseCategories() {
   };
 }
 
-export function useExpenseStats(enabled = true) {
+export function useExpenseStats(enabled = true, storeId?: number | null) {
   const [stats, setStats] = useState<ExpenseStats | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +227,9 @@ export function useExpenseStats(enabled = true) {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<ExpenseStats>('/expenses/stats/');
+      const params = new URLSearchParams();
+      if (storeId) params.append('store_id', storeId.toString());
+      const response = await api.get<ExpenseStats>(`/expenses/stats/${params.toString() ? `?${params.toString()}` : ''}`);
       setStats(response.data);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -228,7 +237,7 @@ export function useExpenseStats(enabled = true) {
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, storeId]);
 
   useEffect(() => {
     if (!enabled) {

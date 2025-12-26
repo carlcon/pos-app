@@ -23,6 +23,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useProducts } from '@/hooks/useProducts';
 import { useSales } from '@/hooks/useSales';
+import { useStore } from '@/context/StoreContext';
 import type { Product } from '@/types';
 
 interface CartItem {
@@ -33,8 +34,9 @@ interface CartItem {
 }
 
 function POSContent() {
-  const { lookupBarcode } = useProducts();
-  const { createSale, loading: saleLoading } = useSales();
+  const { selectedStore, selectedStoreId } = useStore();
+  const { lookupBarcode } = useProducts({}, selectedStoreId);
+  const { createSale, loading: saleLoading } = useSales(selectedStoreId);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -170,6 +172,7 @@ function POSContent() {
         quantity: item.quantity,
         unit_price: item.unitPrice.toString(),
       })),
+      store: selectedStoreId || undefined,
     };
 
     try {

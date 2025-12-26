@@ -13,9 +13,11 @@ interface CreateSaleData {
   }>;
   discount?: string;
   notes?: string;
+  is_wholesale?: boolean;
+  store?: number;
 }
 
-export function useSales() {
+export function useSales(storeId?: number | null) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,10 @@ export function useSales() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<PaginatedResponse<Sale>>(`/sales/?page=${page}`);
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      if (storeId) params.append('store_id', storeId.toString());
+      const response = await api.get<PaginatedResponse<Sale>>(`/sales/?${params.toString()}`);
       setSales(response.data.results);
       setTotalCount(response.data.count);
     } catch (err: any) {
@@ -34,7 +39,7 @@ export function useSales() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, storeId]);
 
   useEffect(() => {
     fetchSales();
@@ -42,7 +47,8 @@ export function useSales() {
 
   const createSale = async (data: CreateSaleData) => {
     try {
-      const response = await api.post<Sale>('/sales/', data);
+      const payload = storeId ? { ...data, store: storeId } : data;
+      const response = await api.post<Sale>('/sales/', payload);
       await fetchSales();
       return response.data;
     } catch (error) {

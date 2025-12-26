@@ -1,13 +1,15 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
-import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
+import { useStore } from '@/context/StoreContext';
+import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Select, SelectItem, Chip, type Selection } from '@heroui/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 export function Navbar() {
   const { user, logout, isSuperAdmin, isImpersonating, impersonatedPartner, exitImpersonation } = useAuth();
+  const { stores, selectedStoreId, setSelectedStoreId, loading: storeLoading, selectedStore } = useStore();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -39,6 +41,21 @@ export function Navbar() {
   ];
 
   const showTenantNav = !isSuperAdmin || isImpersonating;
+  const storeSelectValue = selectedStoreId ? selectedStoreId.toString() : 'all';
+  const storeOptions: { key: string; label: string }[] = [
+    { key: 'all', label: 'All Stores' },
+    ...stores.map(store => ({ key: store.id.toString(), label: store.name })),
+  ];
+
+  const handleStoreSelection = (keys: Selection) => {
+    if (keys === 'all') {
+      setSelectedStoreId(null);
+      return;
+    }
+    const first = Array.from(keys)[0];
+    if (first === undefined) return;
+    setSelectedStoreId(first === 'all' ? null : Number(first));
+  };
 
   return (
     <>
@@ -126,10 +143,32 @@ export function Navbar() {
             <div className="flex items-center gap-3">
               {/* Partner Badge (for non-super-admin or when impersonating) */}
               {(user?.partner || isImpersonating) && (
-                <div className="hidden md:flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
+                <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
                   <span>🏢</span>
                   <span>{isImpersonating ? impersonatedPartner?.name : user?.partner?.name}</span>
                 </div>
+              )}
+
+              {/* Store Picker */}
+              {showTenantNav && (
+                <Select
+                  aria-label="Store selector"
+                  size="sm"
+                  isLoading={storeLoading}
+                  selectedKeys={new Set([storeSelectValue])}
+                  onSelectionChange={handleStoreSelection}
+                  className="hidden md:block min-w-[180px]"
+                  radius="lg"
+                  variant="bordered"
+                  disallowEmptySelection
+                  items={storeOptions}
+                >
+                  {(item) => (
+                    <SelectItem key={item.key} textValue={item.label}>
+                      {item.label}
+                    </SelectItem>
+                  )}
+                </Select>
               )}
               
               {/* Super Admin Badge */}
@@ -187,7 +226,36 @@ export function Navbar() {
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="lg:hidden py-4 border-t border-gray-200">
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-3">
+                {showTenantNav && (
+                  <div className="px-4">
+                    <div className="text-xs text-gray-500 mb-1">Store</div>
+                    <Select
+                      aria-label="Store selector mobile"
+                      size="sm"
+                      isLoading={storeLoading}
+                      selectedKeys={new Set([storeSelectValue])}
+                      onSelectionChange={handleStoreSelection}
+                      radius="lg"
+                      variant="bordered"
+                      disallowEmptySelection
+                      items={storeOptions}
+                    >
+                      {(item) => (
+                        <SelectItem key={item.key} textValue={item.label}>
+                          {item.label}
+                        </SelectItem>
+                      )}
+                    </Select>
+                    {selectedStore && (
+                      <div className="mt-2">
+                        <Chip size="sm" color="primary" variant="flat">
+                          {selectedStore.name}
+                        </Chip>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {showTenantNav && navLinks.map((link) => (
                   <Link
                     key={link.href}

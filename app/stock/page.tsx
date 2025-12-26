@@ -23,6 +23,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useStock } from '@/hooks/useStock';
 import { useProducts } from '@/hooks/useProducts';
+import { useStore } from '@/context/StoreContext';
 import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
 
@@ -30,8 +31,9 @@ type TransactionType = 'IN' | 'OUT' | 'ADJUSTMENT';
 type ReasonType = 'PURCHASE' | 'SALE' | 'DAMAGED' | 'LOST' | 'RECONCILIATION' | 'RETURN' | 'MANUAL';
 
 function StockContent() {
-  const { transactions, loading, error, createAdjustment } = useStock();
-  const { products } = useProducts();
+  const { selectedStoreId } = useStore();
+  const { transactions, loading, error, createAdjustment } = useStock(selectedStoreId);
+  const { products } = useProducts({}, selectedStoreId);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isBarcodeOpen, onOpen: onBarcodeOpen, onClose: onBarcodeClose } = useDisclosure();
   const [formData, setFormData] = useState({

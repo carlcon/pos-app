@@ -33,6 +33,7 @@ import {
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useExpenses, useExpenseCategories, useExpenseStats, Expense } from '@/hooks/useExpenses';
+import { useStore } from '@/context/StoreContext';
 
 const PAYMENT_METHODS = [
   { key: 'CASH', label: 'Cash' },
@@ -45,7 +46,8 @@ const PAYMENT_METHODS = [
 ];
 
 function ExpensesContent() {
-  const { stats, loading: statsLoading } = useExpenseStats();
+  const { selectedStoreId } = useStore();
+  const { stats, loading: statsLoading } = useExpenseStats(true, selectedStoreId);
   const { 
     expenses, 
     loading, 
@@ -58,8 +60,8 @@ function ExpensesContent() {
     createExpense, 
     updateExpense,
     deleteExpense,
-  } = useExpenses();
-  const { categories } = useExpenseCategories();
+  } = useExpenses(selectedStoreId);
+  const { categories } = useExpenseCategories(selectedStoreId);
   
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();

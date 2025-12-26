@@ -18,6 +18,18 @@ export interface PartnerMinimal {
   code: string;
 }
 
+export interface Store {
+  id: number;
+  name: string;
+  code: string;
+  address?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // User types
 export interface User {
   id: number;
@@ -34,6 +46,7 @@ export interface User {
   partner?: PartnerMinimal;
   date_joined: string;
   last_login?: string;
+  default_store?: Store | null;
 }
 
 export interface AuthTokens {
@@ -162,6 +175,7 @@ export interface Sale {
   notes?: string;
   cashier: number;
   cashier_username?: string;
+  store?: number | Store | null;
   items?: SaleItem[];
   created_at: string;
 }
@@ -185,6 +199,7 @@ export interface StockTransaction {
   notes?: string;
   performed_by: number;
   performed_by_username?: string;
+  store?: number | Store | null;
   created_at: string;
 }
 
