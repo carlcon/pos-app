@@ -84,10 +84,28 @@ export function ReportExport({ reportType, reportName, filters }: ReportExportPr
     setPollingInterval(interval);
   };
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     if (taskStatus?.download_url) {
-      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL}${taskStatus.download_url}`;
-      window.open(downloadUrl, '_blank');
+      try {
+        // Remove leading /api since api client already has the base URL
+        const downloadPath = taskStatus.download_url.replace(/^\/api/, '');
+        const response = await api.get(downloadPath, {
+          responseType: 'blob',
+        });
+        
+        // Create blob URL and trigger download
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = taskStatus.download_url.split('/').slice(-2, -1)[0] || 'report.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Download error:', error);
+      }
     }
   };
 
