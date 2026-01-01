@@ -79,7 +79,7 @@ function ReportViewerContent() {
     if (saved) {
       try {
         const savedFilters = JSON.parse(saved);
-        setFilters({ ...filters, ...savedFilters, page: 1 });
+        setFilters(prev => ({ ...prev, ...savedFilters, page: 1 }));
       } catch (error) {
         console.error('Failed to load saved filters:', error);
       }
@@ -89,7 +89,8 @@ function ReportViewerContent() {
   // Save filters to localStorage
   useEffect(() => {
     const storageKey = `report_filters_${reportType}`;
-    const { page, page_size, ...filtersToSave } = filters;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { page: _page, page_size: _pageSize, ...filtersToSave } = filters;
     localStorage.setItem(storageKey, JSON.stringify(filtersToSave));
   }, [filters, reportType]);
 
@@ -112,6 +113,7 @@ function ReportViewerContent() {
   // Fetch report data
   useEffect(() => {
     fetchReportData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportType, filters.page, filters.page_size]);
 
   const fetchReportData = async () => {
@@ -278,10 +280,10 @@ function ReportViewerContent() {
                 onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
                 className="w-32"
               >
-                <SelectItem key="10" value="10">10</SelectItem>
-                <SelectItem key="20" value="20">20</SelectItem>
-                <SelectItem key="50" value="50">50</SelectItem>
-                <SelectItem key="100" value="100">100</SelectItem>
+                <SelectItem key="10">10</SelectItem>
+                <SelectItem key="20">20</SelectItem>
+                <SelectItem key="50">50</SelectItem>
+                <SelectItem key="100">100</SelectItem>
               </Select>
             </div>
 

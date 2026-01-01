@@ -24,7 +24,9 @@ import {
   TableRow,
   TableCell,
   Divider,
+  DatePicker,
 } from '@heroui/react';
+import { parseDate } from '@internationalized/date';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
@@ -53,8 +55,8 @@ function SalesHistoryContent() {
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState<ReturnType<typeof parseDate> | null>(null);
+  const [dateTo, setDateTo] = useState<ReturnType<typeof parseDate> | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [selectedStoreId, setSelectedStoreId] = useState<string>('');
   
@@ -74,8 +76,16 @@ function SalesHistoryContent() {
       try {
         const filters = JSON.parse(savedFilters);
         setSearchQuery(filters.searchQuery || '');
-        setDateFrom(filters.dateFrom || '');
-        setDateTo(filters.dateTo || '');
+        if (filters.dateFrom) {
+          try {
+            setDateFrom(parseDate(filters.dateFrom));
+          } catch {}
+        }
+        if (filters.dateTo) {
+          try {
+            setDateTo(parseDate(filters.dateTo));
+          } catch {}
+        }
         setPaymentMethod(filters.paymentMethod || '');
         setSelectedStoreId(filters.selectedStoreId || '');
       } catch {
@@ -86,7 +96,13 @@ function SalesHistoryContent() {
 
   // Save filters to localStorage
   useEffect(() => {
-    const filters = { searchQuery, dateFrom, dateTo, paymentMethod, selectedStoreId };
+    const filters = { 
+      searchQuery, 
+      dateFrom: dateFrom ? dateFrom.toString() : '', 
+      dateTo: dateTo ? dateTo.toString() : '', 
+      paymentMethod, 
+      selectedStoreId 
+    };
     localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
   }, [searchQuery, dateFrom, dateTo, paymentMethod, selectedStoreId]);
 
@@ -124,8 +140,8 @@ function SalesHistoryContent() {
         
         if (storeId) params.append('store_id', storeId);
         if (searchQuery) params.append('search', searchQuery);
-        if (dateFrom) params.append('date_from', dateFrom);
-        if (dateTo) params.append('date_to', dateTo);
+        if (dateFrom) params.append('date_from', dateFrom.toString());
+        if (dateTo) params.append('date_to', dateTo.toString());
         if (paymentMethod) params.append('payment_method', paymentMethod);
         
         const response = await api.get<PaginatedResponse<Sale>>(`/sales/?${params.toString()}`);
@@ -163,8 +179,8 @@ function SalesHistoryContent() {
   // Clear filters
   const handleClearFilters = () => {
     setSearchQuery('');
-    setDateFrom('');
-    setDateTo('');
+    setDateFrom(null);
+    setDateTo(null);
     setPaymentMethod('');
     setSelectedStoreId('');
     setPage(1);
@@ -211,108 +227,107 @@ function SalesHistoryContent() {
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
-          <CardBody className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-              <Input
-                placeholder="Search by sale # or customer..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setPage(1);
-                }}
-                size="sm"
-                startContent={<span>🔍</span>}
-                classNames={{
-                  base: "w-full",
-                  inputWrapper: "h-10"
-                }}
-              />
-              
-              <Input
-                type="date"
-                label="From Date"
-                labelPlacement="inside"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value);
-                  setPage(1);
-                }}
-                size="sm"
-                classNames={{
-                  base: "w-full",
-                  inputWrapper: "h-10"
-                }}
-              />
-              
-              <Input
-                type="date"
-                label="To Date"
-                labelPlacement="inside"
-                value={dateTo}
-                onChange={(e) => {
-                  setDateTo(e.target.value);
-                  setPage(1);
-                }}
-                size="sm"
-                classNames={{
-                  base: "w-full",
-                  inputWrapper: "h-10"
-                }}
-              />
-              
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6 xl:p-8 mb-6">
+          <h3 className="text-xs sm:text-sm xl:text-base font-semibold text-[#049AE0] uppercase tracking-wide mb-3 sm:mb-4 xl:mb-6">Filters</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 xl:gap-6">
+            <Input
+              placeholder="Search by sale # or customer..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+              className="w-full"
+              classNames={{
+                input: "text-sm focus:!outline-none",
+                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] focus-within:!border-[#049AE0] shadow-sm h-13"
+              }}
+            />
+            
+            <DatePicker
+              label="From Date"
+              value={dateFrom}
+              onChange={(date) => {
+                setDateFrom(date);
+                setPage(1);
+              }}
+              className="w-full"
+              classNames={{
+                base: "w-full",
+                selectorButton: "text-sm",
+                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm h-13",
+                input: "text-sm"
+              }}
+            />
+            
+            <DatePicker
+              label="To Date"
+              value={dateTo}
+              onChange={(date) => {
+                setDateTo(date);
+                setPage(1);
+              }}
+              className="w-full"
+              classNames={{
+                base: "w-full",
+                selectorButton: "text-sm",
+                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm h-13",
+                input: "text-sm"
+              }}
+            />
+            
+            <Select
+              placeholder="Payment Method"
+              selectedKeys={paymentMethod ? new Set([paymentMethod]) : new Set()}
+              onSelectionChange={(keys) => {
+                setPaymentMethod(Array.from(keys)[0] as string || '');
+                setPage(1);
+              }}
+              className="w-full"
+              classNames={{
+                trigger: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm h-13 min-h-10 cursor-pointer",
+                value: "text-sm"
+              }}
+            >
+              {PAYMENT_METHODS.map((method) => (
+                <SelectItem key={method.key}>{method.label}</SelectItem>
+              ))}
+            </Select>
+            
+            {showStoreFilter && (
               <Select
-                placeholder="Payment Method"
-                selectedKeys={paymentMethod ? new Set([paymentMethod]) : new Set()}
+                placeholder="All Stores"
+                selectedKeys={selectedStoreId ? new Set([selectedStoreId]) : new Set()}
                 onSelectionChange={(keys) => {
-                  setPaymentMethod(Array.from(keys)[0] as string || '');
+                  setSelectedStoreId(Array.from(keys)[0] as string || '');
                   setPage(1);
                 }}
-                size="sm"
+                className="w-full"
                 classNames={{
-                  base: "w-full",
-                  trigger: "h-10"
+                  trigger: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm h-13 min-h-10 cursor-pointer",
+                  value: "text-sm"
                 }}
               >
-                {PAYMENT_METHODS.map((method) => (
-                  <SelectItem key={method.key}>{method.label}</SelectItem>
-                ))}
+                {[
+                  <SelectItem key="">All Stores</SelectItem>,
+                  ...stores.map((store) => (
+                    <SelectItem key={store.id.toString()}>{store.name}</SelectItem>
+                  ))
+                ]}
               </Select>
-              
-              {showStoreFilter && (
-                <Select
-                  placeholder="All Stores"
-                  selectedKeys={selectedStoreId ? new Set([selectedStoreId]) : new Set()}
-                  onSelectionChange={(keys) => {
-                    setSelectedStoreId(Array.from(keys)[0] as string || '');
-                    setPage(1);
-                  }}
-                  size="sm"
-                  classNames={{
-                    base: "w-full",
-                    trigger: "h-10"
-                  }}
-                >
-                  {[
-                    <SelectItem key="">All Stores</SelectItem>,
-                    ...stores.map((store) => (
-                      <SelectItem key={store.id.toString()}>{store.name}</SelectItem>
-                    ))
-                  ]}
-                </Select>
-              )}
-              
-              <Button
-                variant="flat"
-                size="sm"
-                onPress={handleClearFilters}
-                className="h-10 w-full"
+            )}
+          </div>
+          {(searchQuery || dateFrom || dateTo || paymentMethod || selectedStoreId) && (
+            <div className="mt-4">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 text-sm font-medium text-[#049AE0] bg-[#049AE0]/5 border border-[#049AE0]/20 rounded-lg hover:bg-[#049AE0]/10 transition-colors"
               >
-                Clear Filters
-              </Button>
+                Clear All Filters
+              </button>
             </div>
-          </CardBody>
-        </Card>
+          )}
+        </div>
 
         {/* Sales Table */}
         <Card>

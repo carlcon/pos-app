@@ -1,6 +1,7 @@
 'use client';
 
-import { Input, Select, SelectItem, Button } from '@heroui/react';
+import { Input, Select, SelectItem, Button, DatePicker } from '@heroui/react';
+import { parseDate } from '@internationalized/date';
 import type { ReportFilters } from '@/types';
 
 interface ReportFiltersProps {
@@ -43,7 +44,6 @@ export function ReportFilters({
   categories = [],
   showStoreFilter = false,
 }: ReportFiltersProps) {
-  const isSalesReport = ['daily-sales', 'weekly-sales', 'monthly-revenue', 'payment-breakdown'].includes(reportType);
   const isInventoryReport = ['stock-levels', 'low-stock', 'stock-movement', 'inventory-valuation'].includes(reportType);
   const isProductReport = ['top-selling', 'products-by-category'].includes(reportType);
   const isExpenseReport = ['monthly-expenses', 'expenses-by-category', 'expenses-by-vendor', 'expense-transactions'].includes(reportType);
@@ -60,27 +60,36 @@ export function ReportFilters({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {/* Date filters for most reports */}
         {(reportType === 'daily-sales') && (
-          <Input
-            type="date"
+          <DatePicker
             label="Date"
-            value={filters.date || ''}
-            onChange={(e) => onFilterChange('date', e.target.value)}
+            value={filters.date ? parseDate(filters.date) : null}
+            onChange={(date) => onFilterChange('date', date ? date.toString() : '')}
+            classNames={{
+              base: "w-full",
+              inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+            }}
           />
         )}
 
         {(['weekly-sales', 'monthly-revenue', 'stock-movement', 'top-selling', 'monthly-expenses', 'expenses-by-category', 'expenses-by-vendor', 'expense-transactions'].includes(reportType)) && (
           <>
-            <Input
-              type="date"
+            <DatePicker
               label="From Date"
-              value={filters.date_from || ''}
-              onChange={(e) => onFilterChange('date_from', e.target.value)}
+              value={filters.date_from ? parseDate(filters.date_from) : null}
+              onChange={(date) => onFilterChange('date_from', date ? date.toString() : '')}
+              classNames={{
+                base: "w-full",
+                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+              }}
             />
-            <Input
-              type="date"
+            <DatePicker
               label="To Date"
-              value={filters.date_to || ''}
-              onChange={(e) => onFilterChange('date_to', e.target.value)}
+              value={filters.date_to ? parseDate(filters.date_to) : null}
+              onChange={(date) => onFilterChange('date_to', date ? date.toString() : '')}
+              classNames={{
+                base: "w-full",
+                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+              }}
             />
           </>
         )}
@@ -95,10 +104,10 @@ export function ReportFilters({
               onFilterChange('days', value ? parseInt(value as string) : 30);
             }}
           >
-            <SelectItem key="7" value="7">Last 7 days</SelectItem>
-            <SelectItem key="30" value="30">Last 30 days</SelectItem>
-            <SelectItem key="60" value="60">Last 60 days</SelectItem>
-            <SelectItem key="90" value="90">Last 90 days</SelectItem>
+            <SelectItem key="7">Last 7 days</SelectItem>
+            <SelectItem key="30">Last 30 days</SelectItem>
+            <SelectItem key="60">Last 60 days</SelectItem>
+            <SelectItem key="90">Last 90 days</SelectItem>
           </Select>
         )}
 
@@ -114,7 +123,7 @@ export function ReportFilters({
             }}
           >
             {PAYMENT_METHODS.map((method) => (
-              <SelectItem key={method.key} value={method.key}>
+              <SelectItem key={method.key}>
                 {method.label}
               </SelectItem>
             ))}
@@ -133,7 +142,7 @@ export function ReportFilters({
             }}
           >
             {categories.map((cat) => (
-              <SelectItem key={String(cat.id)} value={String(cat.id)}>
+              <SelectItem key={String(cat.id)}>
                 {cat.name}
               </SelectItem>
             ))}
@@ -151,7 +160,7 @@ export function ReportFilters({
             }}
           >
             {STOCK_STATUS.map((status) => (
-              <SelectItem key={status.key} value={status.key}>
+              <SelectItem key={status.key}>
                 {status.label}
               </SelectItem>
             ))}
@@ -170,7 +179,7 @@ export function ReportFilters({
             }}
           >
             {TRANSACTION_TYPES.map((type) => (
-              <SelectItem key={type.key} value={type.key}>
+              <SelectItem key={type.key}>
                 {type.label}
               </SelectItem>
             ))}
@@ -198,10 +207,10 @@ export function ReportFilters({
               onFilterChange('limit', value ? parseInt(value as string) : 20);
             }}
           >
-            <SelectItem key="10" value="10">Top 10</SelectItem>
-            <SelectItem key="20" value="20">Top 20</SelectItem>
-            <SelectItem key="50" value="50">Top 50</SelectItem>
-            <SelectItem key="100" value="100">Top 100</SelectItem>
+            <SelectItem key="10">Top 10</SelectItem>
+            <SelectItem key="20">Top 20</SelectItem>
+            <SelectItem key="50">Top 50</SelectItem>
+            <SelectItem key="100">Top 100</SelectItem>
           </Select>
         )}
 
@@ -217,7 +226,7 @@ export function ReportFilters({
             }}
           >
             {stores.map((store) => (
-              <SelectItem key={String(store.id)} value={String(store.id)}>
+              <SelectItem key={String(store.id)}>
                 {store.name}
               </SelectItem>
             ))}

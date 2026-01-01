@@ -29,7 +29,9 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
+  DatePicker,
 } from '@heroui/react';
+import { parseDate, today, getLocalTimeZone } from '@internationalized/date';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useExpenses, useExpenseCategories, useExpenseStats, Expense } from '@/hooks/useExpenses';
@@ -73,7 +75,7 @@ function ExpensesContent() {
     amount: '',
     category: '',
     payment_method: 'CASH',
-    expense_date: new Date().toISOString().split('T')[0],
+    expense_date: today(getLocalTimeZone()) as any,
     receipt_number: '',
     vendor: '',
     notes: '',
@@ -86,7 +88,7 @@ function ExpensesContent() {
       amount: '',
       category: '',
       payment_method: 'CASH',
-      expense_date: new Date().toISOString().split('T')[0],
+      expense_date: today(getLocalTimeZone()) as any,
       receipt_number: '',
       vendor: '',
       notes: '',
@@ -110,7 +112,7 @@ function ExpensesContent() {
         amount: parseFloat(formData.amount),
         category: formData.category ? parseInt(formData.category) : undefined,
         payment_method: formData.payment_method,
-        expense_date: formData.expense_date,
+        expense_date: formData.expense_date.toString(),
         receipt_number: formData.receipt_number || undefined,
         vendor: formData.vendor || undefined,
         notes: formData.notes || undefined,
@@ -140,7 +142,7 @@ function ExpensesContent() {
       amount: expense.amount,
       category: expense.category?.toString() || '',
       payment_method: expense.payment_method,
-      expense_date: expense.expense_date,
+      expense_date: parseDate(expense.expense_date) as any,
       receipt_number: expense.receipt_number,
       vendor: expense.vendor,
       notes: expense.notes,
@@ -158,7 +160,7 @@ function ExpensesContent() {
         amount: parseFloat(formData.amount),
         category: formData.category ? parseInt(formData.category) : undefined,
         payment_method: formData.payment_method,
-        expense_date: formData.expense_date,
+        expense_date: formData.expense_date.toString(),
         receipt_number: formData.receipt_number || undefined,
         vendor: formData.vendor || undefined,
         notes: formData.notes || undefined,
@@ -225,12 +227,15 @@ function ExpensesContent() {
           isRequired
           startContent={<span className="text-default-400">₱</span>}
         />
-        <Input
+        <DatePicker
           label="Date"
-          type="date"
           value={formData.expense_date}
-          onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
+          onChange={(date) => setFormData({ ...formData, expense_date: date as any })}
           isRequired
+          classNames={{
+            base: "w-full",
+            inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+          }}
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -372,19 +377,25 @@ function ExpensesContent() {
                   <SelectItem key={pm.key}>{pm.label}</SelectItem>
                 ))}
               </Select>
-              <Input
+              <DatePicker
                 label="From Date"
-                type="date"
                 className="max-w-xs"
-                value={filters.start_date || ''}
-                onChange={(e) => setFilters({ ...filters, start_date: e.target.value || undefined })}
+                value={filters.start_date ? parseDate(filters.start_date) : null}
+                onChange={(date) => setFilters({ ...filters, start_date: date ? date.toString() : undefined })}
+                classNames={{
+                  base: "w-full",
+                  inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+                }}
               />
-              <Input
+              <DatePicker
                 label="To Date"
-                type="date"
                 className="max-w-xs"
-                value={filters.end_date || ''}
-                onChange={(e) => setFilters({ ...filters, end_date: e.target.value || undefined })}
+                value={filters.end_date ? parseDate(filters.end_date) : null}
+                onChange={(date) => setFilters({ ...filters, end_date: date ? date.toString() : undefined })}
+                classNames={{
+                  base: "w-full",
+                  inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+                }}
               />
               <Button 
                 variant="flat" 

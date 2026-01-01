@@ -32,7 +32,7 @@ import type { Product, Store } from '@/types';
 import api from '@/lib/api';
 
 function ProductsContent() {
-  const { effectiveStoreId, isPartnerAdmin, isImpersonatingStore } = useAuth();
+  const { effectiveStoreId, isPartnerAdmin } = useAuth();
   const { selectedStoreId } = useStore();
   const { categories, loading: categoriesLoading } = useCategories(selectedStoreId);
   const [products, setProducts] = useState<Product[]>([]);
@@ -218,7 +218,7 @@ function ProductsContent() {
           const reorder = row.original.minimum_stock_level;
           const color = stock === 0 ? 'bg-red-100 text-red-700' : stock <= reorder ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700';
           return (
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${color}`}>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-md font-semibold ${color}`}>
               {stock}
             </span>
           );
@@ -241,7 +241,7 @@ function ProductsContent() {
         cell: ({ row }) => (
           <button
             onClick={() => handleEdit(row.original)}
-            className="px-4 py-2 text-sm font-medium text-[#049AE0] bg-white border border-[#049AE0] rounded-lg hover:bg-[#049AE0] hover:text-white transition-colors duration-200"
+            className="px-4 py-2 text-sm font-medium text-[#049AE0] bg-white border border-[#049AE0] rounded-lg hover:bg-[#049AE0] hover:text-white transition-colors duration-200 cursor-pointer"
           >
             Edit
           </button>
