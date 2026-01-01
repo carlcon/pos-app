@@ -135,6 +135,8 @@ const COLUMN_CONFIGS: Record<string, ReportColumn[]> = {
 function formatCellValue(value: unknown, format?: string): string {
   if (value === null || value === undefined) return '-';
   
+  const strValue = String(value);
+  
   // If value is already a formatted string (contains currency symbol or percentage), return as-is
   if (typeof value === 'string' && (value.includes('₱') || value.includes('%'))) {
     return value;
@@ -142,17 +144,17 @@ function formatCellValue(value: unknown, format?: string): string {
   
   switch (format) {
     case 'currency':
-      return `₱${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `₱${parseFloat(strValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     case 'number':
-      return parseFloat(value).toLocaleString('en-US');
+      return parseFloat(strValue).toLocaleString('en-US');
     case 'percentage':
-      return `${parseFloat(value).toFixed(2)}%`;
+      return `${parseFloat(strValue).toFixed(2)}%`;
     case 'date':
-      return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return new Date(strValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     case 'datetime':
-      return new Date(value).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return new Date(strValue).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     default:
-      return String(value);
+      return strValue;
   }
 }
 
@@ -180,12 +182,19 @@ export function ReportTable({
     );
   }
 
+  // Add _idx for keys and ensure proper typing
+  type ItemWithIndex = Record<string, unknown> & { _idx: number };
+  const itemsWithIndex: ItemWithIndex[] = data.map((item, idx) => ({ ...item, _idx: idx }));
+
   return (
     <div className="overflow-x-auto">
       <Table
         aria-label="Report data table"
         sortDescriptor={sortDescriptor}
-        onSortChange={onSortChange as (descriptor: { column: string; direction: 'ascending' | 'descending' }) => void}
+        onSortChange={(descriptor) => onSortChange?.({
+          column: String(descriptor.column),
+          direction: descriptor.direction as 'ascending' | 'descending'
+        })}
         classNames={{
           wrapper: 'min-w-full',
           table: 'min-w-full',
@@ -203,23 +212,23 @@ export function ReportTable({
           )}
         </TableHeader>
         <TableBody
-          items={data.map((item, idx) => ({ ...item, _idx: idx }))}
+          items={itemsWithIndex}
           isLoading={loading}
           loadingContent={<Spinner label="Loading..." />}
           emptyContent="No data available"
         >
           {(item) => (
-            <TableRow key={item.id ? String(item.id) : `row-${item._idx}`}>
+            <TableRow key={item.id !== undefined ? String(item.id) : `row-${item._idx}`}>
               {(columnKey) => {
                 const column = columns.find((c) => c.key === columnKey);
-                const value = item[columnKey];
+                const value = item[String(columnKey)];
 
                 // Special rendering for status column
                 if (columnKey === 'status') {
                   return (
                     <TableCell>
-                      <Chip color={getStatusColor(value)} size="sm" variant="flat">
-                        {value}
+                      <Chip color={getStatusColor(String(value))} size="sm" variant="flat">
+                        {String(value)}
                       </Chip>
                     </TableCell>
                   );
@@ -237,7 +246,7 @@ export function ReportTable({
                             value === 3 ? 'bg-orange-100 text-orange-700' :
                             'bg-gray-50 text-gray-600'}
                         `}>
-                          {value}
+                          {String(value)}
                         </div>
                       </div>
                     </TableCell>

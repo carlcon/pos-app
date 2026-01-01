@@ -237,7 +237,7 @@ function ReportViewerContent() {
                         ? `${parseFloat(String(value)).toFixed(2)}%`
                         : typeof value === 'number'
                         ? parseFloat(String(value)).toLocaleString('en-US')
-                        : value}
+                        : String(value)}
                     </p>
                   </div>
                 ))}
@@ -297,7 +297,7 @@ function ReportViewerContent() {
               <>
                 <ReportTable
                   reportType={reportType}
-                  data={reportData?.data || []}
+                  data={(reportData?.data || []) as Record<string, unknown>[]}
                   loading={loading}
                 />
 
