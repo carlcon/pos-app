@@ -45,7 +45,7 @@ const initialFormData: PartnerFormData = {
 };
 
 export default function PartnersPage() {
-  const { isSuperAdmin, impersonatePartner, isImpersonating } = useAuth();
+  const { isSuperAdmin, impersonatePartner, isImpersonatingPartner } = useAuth();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -217,7 +217,7 @@ export default function PartnersPage() {
         </div>
 
         {/* Impersonation Notice */}
-        {isImpersonating && (
+        {isImpersonatingPartner && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="text-amber-800">
               <strong>Note:</strong> You are currently impersonating a partner. Exit impersonation to manage partners.
@@ -278,7 +278,7 @@ export default function PartnersPage() {
                       color="primary"
                       variant="flat"
                       onPress={() => handleImpersonate(partner)}
-                      isDisabled={!partner.is_active || isImpersonating}
+                      isDisabled={!partner.is_active || isImpersonatingPartner}
                     >
                       Login As
                     </Button>

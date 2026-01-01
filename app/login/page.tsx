@@ -136,7 +136,7 @@ export default function LoginPage() {
           {/* Footer */}
           <div className="bg-gray-50 px-6 sm:px-8 py-3 sm:py-4 border-t border-gray-100">
             <p className="text-xs sm:text-sm text-gray-500 text-center">
-              <span className="font-semibold text-gray-700">Demo:</span> admin / admin123
+              <span className="font-semibold text-gray-700">Demo:</span> demo / Demo1234@
             </p>
           </div>
         </div>

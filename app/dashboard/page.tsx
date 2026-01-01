@@ -1,6 +1,6 @@
 'use client';
 
-import { Spinner } from '@heroui/react';
+import { Spinner, Select, SelectItem, type Selection } from '@heroui/react';
 import Link from 'next/link';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
@@ -16,12 +16,36 @@ import { useAuth } from '@/context/AuthContext';
 import { useStore } from '@/context/StoreContext';
 
 function DashboardContent() {
-  const { isSuperAdmin, isImpersonating } = useAuth();
-  const { selectedStoreId, selectedStore } = useStore();
-  const tenantEnabled = !(isSuperAdmin && !isImpersonating);
+  const { isSuperAdmin, isImpersonatingPartner, isImpersonatingStore, isStoreLevelUser, effectiveStoreId } = useAuth();
+  const { stores, selectedStoreId, setSelectedStoreId, selectedStore, loading: storeLoading } = useStore();
+  
+  // Tenant enabled when: not super admin OR when impersonating partner/store
+  const tenantEnabled = !isSuperAdmin || isImpersonatingPartner || isImpersonatingStore;
+  
+  // Determine which store ID to use for API calls
+  // Store-level users and store impersonation use their assigned/impersonated store
+  // Partner admins can filter by store
+  const dashboardStoreId = isStoreLevelUser || isImpersonatingStore ? effectiveStoreId : selectedStoreId;
 
-  const { stats, loading, error } = useDashboard(tenantEnabled, selectedStoreId);
-  const { stats: expenseStats, loading: expenseLoading } = useExpenseStats(tenantEnabled, selectedStoreId);
+  const { stats, loading, error } = useDashboard(tenantEnabled, dashboardStoreId);
+  const { stats: expenseStats, loading: expenseLoading } = useExpenseStats(tenantEnabled, dashboardStoreId);
+
+  // Store filter options for Partner Admins
+  const storeSelectValue = selectedStoreId ? selectedStoreId.toString() : 'all';
+  const storeOptions = [
+    { key: 'all', label: 'All Stores' },
+    ...stores.map(store => ({ key: store.id.toString(), label: store.name })),
+  ];
+
+  const handleStoreSelection = (keys: Selection) => {
+    if (keys === 'all') {
+      setSelectedStoreId(null);
+      return;
+    }
+    const first = Array.from(keys)[0];
+    if (first === undefined) return;
+    setSelectedStoreId(first === 'all' ? null : Number(first));
+  };
 
   if (!tenantEnabled) {
     return (
@@ -91,16 +115,45 @@ function DashboardContent() {
     day: 'numeric' 
   });
 
+  // Whether to show store filter (Partner Admin without store impersonation)
+  const showStoreFilter = !isStoreLevelUser && !isImpersonatingStore && stores.length > 1;
+
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <Navbar />
       <div className="p-4 sm:p-6 lg:p-8 xl:p-12 space-y-4 sm:space-y-6 xl:space-y-8">
         {/* Header Section */}
-        <div className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-[#242832]">Business Dashboard</h1>
-          <p className="text-sm sm:text-base xl:text-lg text-default-500">
-            Track your sales, inventory, and performance — one day at a time{selectedStore ? ` (Store: ${selectedStore.name})` : ''}.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-[#242832]">Business Dashboard</h1>
+            <p className="text-sm sm:text-base xl:text-lg text-default-500">
+              Track your sales, inventory, and performance — one day at a time
+              {selectedStore ? ` • ${selectedStore.name}` : ''}.
+            </p>
+          </div>
+          
+          {/* Store Filter for Partner Admins */}
+          {showStoreFilter && (
+            <Select
+              aria-label="Filter by store"
+              size="sm"
+              isLoading={storeLoading}
+              selectedKeys={new Set([storeSelectValue])}
+              onSelectionChange={handleStoreSelection}
+              className="min-w-[200px] max-w-[250px]"
+              radius="lg"
+              variant="bordered"
+              disallowEmptySelection
+              items={storeOptions}
+              label="Filter by Store"
+            >
+              {(item) => (
+                <SelectItem key={item.key} textValue={item.label}>
+                  {item.label}
+                </SelectItem>
+              )}
+            </Select>
+          )}
         </div>
 
         {/* Date Banner */}

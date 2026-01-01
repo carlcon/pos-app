@@ -22,12 +22,35 @@ export interface Store {
   id: number;
   name: string;
   code: string;
+  description?: string;
   address?: string;
   contact_email?: string;
   contact_phone?: string;
   is_active: boolean;
+  is_default?: boolean;
+  admin_count?: number;
+  cashier_count?: number;
+  auto_print_receipt?: boolean;
+  printer_name?: string;
+  receipt_template?: string;
+  partner?: number;
+  partner_name?: string;
+  partner_code?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface StoreUser {
+  id: number;
+  username: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  role: 'STORE_ADMIN' | 'CASHIER';
+  is_active: boolean;
+  sms_phone?: string;
+  created_at: string;
+  default_password?: string;
 }
 
 // User types
@@ -37,13 +60,14 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'ADMIN' | 'INVENTORY_STAFF' | 'CASHIER' | 'VIEWER';
+  role: 'ADMIN' | 'STORE_ADMIN' | 'INVENTORY_STAFF' | 'CASHIER' | 'VIEWER';
   phone?: string;
   employee_id?: string;
   is_active_employee: boolean;
   is_active: boolean;
   is_super_admin: boolean;
   partner?: PartnerMinimal;
+  assigned_store?: Store | null;
   date_joined: string;
   last_login?: string;
   default_store?: Store | null;
@@ -66,9 +90,43 @@ export interface ImpersonationResponse {
   message: string;
 }
 
+export interface StoreImpersonationResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  impersonating_store: Store;
+  message: string;
+}
+
 export interface ImpersonationStatus {
-  is_impersonating: boolean;
+  is_impersonating_partner: boolean;
   partner: Partner | null;
+  is_impersonating_store: boolean;
+  store: Store | null;
+}
+
+// Notification types
+export interface Notification {
+  id: number;
+  notification_type: 'STORE_ADMIN_TRANSFER' | 'LOW_STOCK_ALERT' | 'OUT_OF_STOCK_ALERT' | 'EXPORT_COMPLETE' | 'STORE_DEACTIVATED' | 'STORE_ACTIVATED';
+  title: string;
+  message: string;
+  is_read: boolean;
+  data?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ExportJob {
+  id: number;
+  export_type: 'SALES_CSV' | 'SALES_EXCEL' | 'SALES_PDF' | 'PRODUCTS_CSV' | 'PRODUCTS_EXCEL' | 'STOCK_CSV' | 'STOCK_EXCEL';
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  progress: number;
+  file_name?: string;
+  error_message?: string;
+  filters?: Record<string, unknown>;
+  created_at: string;
+  completed_at?: string;
 }
 
 // Product & Category types
@@ -101,6 +159,8 @@ export interface Product {
   is_active: boolean;
   is_low_stock?: boolean;
   stock_value?: string;
+  available_stores?: number[];
+  available_store_names?: string[];
   created_at: string;
   updated_at: string;
 }

@@ -1,15 +1,27 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
-import { useStore } from '@/context/StoreContext';
-import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Select, SelectItem, Chip, type Selection } from '@heroui/react';
+import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Chip } from '@heroui/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 export function Navbar() {
-  const { user, logout, isSuperAdmin, isImpersonating, impersonatedPartner, exitImpersonation } = useAuth();
-  const { stores, selectedStoreId, setSelectedStoreId, loading: storeLoading, selectedStore } = useStore();
+  const { 
+    user, 
+    logout, 
+    isSuperAdmin,
+    isPartnerAdmin,
+    isStoreAdmin,
+    isCashier,
+    isStoreLevelUser,
+    isImpersonatingPartner, 
+    isImpersonatingStore,
+    impersonatedPartner, 
+    impersonatedStore,
+    exitPartnerImpersonation,
+    exitStoreImpersonation,
+  } = useAuth();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -17,19 +29,50 @@ export function Navbar() {
     await logout();
   };
 
-  const handleExitImpersonation = async () => {
-    await exitImpersonation();
+  const handleExitPartnerImpersonation = async () => {
+    await exitPartnerImpersonation();
+  };
+
+  const handleExitStoreImpersonation = async () => {
+    await exitStoreImpersonation();
   };
 
   const isActive = (path: string) => pathname === path;
 
-  const navLinks = [
-    { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { href: '/products', label: 'Products', icon: '📦' },
-    { href: '/sales', label: 'Sales', icon: '💰' },
-    { href: '/stock', label: 'Stock', icon: '📋' },
-    { href: '/expenses', label: 'Expenses', icon: '💸' },
-  ];
+  // Determine which navigation links to show based on role and impersonation state
+  const getNavLinks = () => {
+    // Cashiers only see POS
+    if (isCashier) {
+      return [{ href: '/pos', label: 'POS', icon: '🛒' }];
+    }
+    
+    // Store Admins see their store's data
+    if (isStoreAdmin || isImpersonatingStore) {
+      return [
+        { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+        { href: '/products', label: 'Products', icon: '📦' },
+        { href: '/pos', label: 'POS', icon: '🛒' },
+        { href: '/sales', label: 'Sales', icon: '💰' },
+        { href: '/stock', label: 'Stock', icon: '📋' },
+        { href: '/expenses', label: 'Expenses', icon: '💸' },
+      ];
+    }
+    
+    // Partner Admin (not impersonating store) - no Stock tab
+    if (isPartnerAdmin || isImpersonatingPartner) {
+      return [
+        { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+        { href: '/stores', label: 'Stores', icon: '🏪' },
+        { href: '/products', label: 'Products', icon: '📦' },
+        { href: '/sales', label: 'Sales', icon: '💰' },
+        { href: '/expenses', label: 'Expenses', icon: '💸' },
+      ];
+    }
+    
+    return [];
+  };
+
+  const navLinks = getNavLinks();
 
   const adminLinks = [
     { href: '/reports', label: 'Reports', icon: '📈' },
@@ -40,51 +83,65 @@ export function Navbar() {
     { href: '/partners', label: 'Partners', icon: '🏢' },
   ];
 
-  const showTenantNav = !isSuperAdmin || isImpersonating;
-  const storeSelectValue = selectedStoreId ? selectedStoreId.toString() : 'all';
-  const storeOptions: { key: string; label: string }[] = [
-    { key: 'all', label: 'All Stores' },
-    ...stores.map(store => ({ key: store.id.toString(), label: store.name })),
-  ];
-
-  const handleStoreSelection = (keys: Selection) => {
-    if (keys === 'all') {
-      setSelectedStoreId(null);
-      return;
-    }
-    const first = Array.from(keys)[0];
-    if (first === undefined) return;
-    setSelectedStoreId(first === 'all' ? null : Number(first));
-  };
+  // Show tenant navigation when: not super admin, OR when impersonating (partner or store)
+  const showTenantNav = !isSuperAdmin || isImpersonatingPartner || isImpersonatingStore;
+  
+  // Show admin features
+  const showAdminLinks = (isPartnerAdmin || isImpersonatingPartner) && !isImpersonatingStore;
+  
+  // Calculate banner height for sticky positioning
+  const bannerHeight = (isImpersonatingPartner ? 40 : 0) + (isImpersonatingStore ? 40 : 0);
 
   return (
     <>
-      {/* Impersonation Banner */}
-      {isImpersonating && impersonatedPartner && (
+      {/* Partner Impersonation Banner */}
+      {isImpersonatingPartner && impersonatedPartner && (
         <div className="bg-amber-500 text-white px-4 py-2 text-center text-sm font-medium sticky top-0 z-[60] shadow-md">
           <div className="flex items-center justify-center gap-4">
             <span>
-              👁️ Viewing as <strong>{impersonatedPartner.name}</strong> ({impersonatedPartner.code})
+              🏢 Viewing Partner: <strong>{impersonatedPartner.name}</strong> ({impersonatedPartner.code})
+            </span>
+            {!isImpersonatingStore && (
+              <Button
+                size="sm"
+                color="warning"
+                variant="flat"
+                className="bg-white/20 hover:bg-white/30 text-white"
+                onPress={handleExitPartnerImpersonation}
+              >
+                Exit Partner View
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Store Impersonation Banner */}
+      {isImpersonatingStore && impersonatedStore && (
+        <div className={`bg-blue-600 text-white px-4 py-2 text-center text-sm font-medium sticky ${isImpersonatingPartner ? 'top-[40px]' : 'top-0'} z-[59] shadow-md`}>
+          <div className="flex items-center justify-center gap-4">
+            <span>
+              🏪 Viewing Store: <strong>{impersonatedStore.name}</strong> ({impersonatedStore.code})
             </span>
             <Button
               size="sm"
-              color="warning"
+              color="primary"
               variant="flat"
               className="bg-white/20 hover:bg-white/30 text-white"
-              onPress={handleExitImpersonation}
+              onPress={handleExitStoreImpersonation}
             >
-              Exit Impersonation
+              Exit Store View
             </Button>
           </div>
         </div>
       )}
       
-      <nav className={`sticky ${isImpersonating ? 'top-[40px]' : 'top-0'} z-50 bg-white border-b border-gray-200 shadow-sm`}>
+      <nav className="sticky bg-white border-b border-gray-200 shadow-sm z-50" style={{ top: `${bannerHeight}px` }}>
         <div className="px-4 sm:px-6 lg:px-8 xl:px-12">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center gap-8">
-              <Link href="/dashboard" className="flex items-center gap-2 group">
+              <Link href={isCashier ? '/pos' : '/dashboard'} className="flex items-center gap-2 group">
                 <div className="w-8 h-8 bg-gradient-to-br from-[#049AE0] to-[#0B7FBF] rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-md group-hover:shadow-lg transition-shadow">
                   P
                 </div>
@@ -107,7 +164,7 @@ export function Navbar() {
                     {link.label}
                   </Link>
                 ))}
-                {showTenantNav && user?.role === 'ADMIN' && adminLinks.map((link) => (
+                {showAdminLinks && adminLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -122,7 +179,7 @@ export function Navbar() {
                   </Link>
                 ))}
                 {/* Super Admin Only Links */}
-                {isSuperAdmin && !isImpersonating && superAdminLinks.map((link) => (
+                {isSuperAdmin && !isImpersonatingPartner && superAdminLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -141,42 +198,40 @@ export function Navbar() {
 
             {/* Right Section */}
             <div className="flex items-center gap-3">
-              {/* Partner Badge (for non-super-admin or when impersonating) */}
-              {(user?.partner || isImpersonating) && (
-                <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
-                  <span>🏢</span>
-                  <span>{isImpersonating ? impersonatedPartner?.name : user?.partner?.name}</span>
+              {/* Current Context Badge */}
+              {isStoreLevelUser && user?.assigned_store && !isImpersonatingStore && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-blue-100 rounded-full text-xs text-blue-700">
+                  <span>🏪</span>
+                  <span>{user.assigned_store.name}</span>
                 </div>
               )}
-
-              {/* Store Picker */}
-              {showTenantNav && (
-                <Select
-                  aria-label="Store selector"
-                  size="sm"
-                  isLoading={storeLoading}
-                  selectedKeys={new Set([storeSelectValue])}
-                  onSelectionChange={handleStoreSelection}
-                  className="hidden md:block min-w-[180px]"
-                  radius="lg"
-                  variant="bordered"
-                  disallowEmptySelection
-                  items={storeOptions}
-                >
-                  {(item) => (
-                    <SelectItem key={item.key} textValue={item.label}>
-                      {item.label}
-                    </SelectItem>
-                  )}
-                </Select>
+              
+              {/* Partner Badge (for Partner Admin not impersonating) */}
+              {!isSuperAdmin && !isStoreLevelUser && user?.partner && !isImpersonatingPartner && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
+                  <span>🏢</span>
+                  <span>{user.partner.name}</span>
+                </div>
               )}
               
               {/* Super Admin Badge */}
-              {isSuperAdmin && !isImpersonating && (
+              {isSuperAdmin && !isImpersonatingPartner && (
                 <div className="hidden md:flex items-center gap-1 px-3 py-1 bg-purple-100 rounded-full text-xs text-purple-700 font-medium">
                   <span>⚡</span>
                   <span>Super Admin</span>
                 </div>
+              )}
+
+              {/* Role Badge */}
+              {isStoreAdmin && (
+                <Chip size="sm" color="primary" variant="flat" className="hidden md:flex">
+                  Store Admin
+                </Chip>
+              )}
+              {isCashier && (
+                <Chip size="sm" color="success" variant="flat" className="hidden md:flex">
+                  Cashier
+                </Chip>
               )}
               
               {/* User Menu */}
@@ -188,7 +243,7 @@ export function Navbar() {
                     </div>
                     <div className="hidden md:block text-left">
                       <p className="text-sm font-semibold text-[#242832]">{user?.username}</p>
-                      <p className="text-xs text-gray-500 capitalize">{user?.role?.toLowerCase()}</p>
+                      <p className="text-xs text-gray-500 capitalize">{user?.role?.toLowerCase().replace('_', ' ')}</p>
                     </div>
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -227,35 +282,6 @@ export function Navbar() {
           {mobileMenuOpen && (
             <div className="lg:hidden py-4 border-t border-gray-200">
               <div className="flex flex-col gap-3">
-                {showTenantNav && (
-                  <div className="px-4">
-                    <div className="text-xs text-gray-500 mb-1">Store</div>
-                    <Select
-                      aria-label="Store selector mobile"
-                      size="sm"
-                      isLoading={storeLoading}
-                      selectedKeys={new Set([storeSelectValue])}
-                      onSelectionChange={handleStoreSelection}
-                      radius="lg"
-                      variant="bordered"
-                      disallowEmptySelection
-                      items={storeOptions}
-                    >
-                      {(item) => (
-                        <SelectItem key={item.key} textValue={item.label}>
-                          {item.label}
-                        </SelectItem>
-                      )}
-                    </Select>
-                    {selectedStore && (
-                      <div className="mt-2">
-                        <Chip size="sm" color="primary" variant="flat">
-                          {selectedStore.name}
-                        </Chip>
-                      </div>
-                    )}
-                  </div>
-                )}
                 {showTenantNav && navLinks.map((link) => (
                   <Link
                     key={link.href}
@@ -271,7 +297,7 @@ export function Navbar() {
                     {link.label}
                   </Link>
                 ))}
-                {showTenantNav && user?.role === 'ADMIN' && adminLinks.map((link) => (
+                {showAdminLinks && adminLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -287,7 +313,7 @@ export function Navbar() {
                   </Link>
                 ))}
                 {/* Super Admin Mobile Links */}
-                {isSuperAdmin && !isImpersonating && superAdminLinks.map((link) => (
+                {isSuperAdmin && !isImpersonatingPartner && superAdminLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}

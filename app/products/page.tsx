@@ -27,21 +27,24 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useCategories } from '@/hooks/useCategories';
 import { useStore } from '@/context/StoreContext';
-import type { Product } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import type { Product, Store } from '@/types';
 import api from '@/lib/api';
 
 function ProductsContent() {
+  const { effectiveStoreId, isPartnerAdmin, isImpersonatingStore } = useAuth();
   const { selectedStoreId } = useStore();
   const { categories, loading: categoriesLoading } = useCategories(selectedStoreId);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [globalFilter, setGlobalFilter] = useState('');
-  const [barcodeSearch, setBarcodeSearch] = useState('');
+  const [storeFilter, setStoreFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<string>('all');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const [formData, setFormData] = useState({
@@ -53,19 +56,44 @@ function ProductsContent() {
     cost_price: '',
     selling_price: '',
     wholesale_price: '',
-    current_stock: '',
-    minimum_stock_level: '',
     unit_of_measure: 'PIECE',
     is_active: true,
   });
 
+  // Fetch stores for partner admins
+  useEffect(() => {
+    const fetchStores = async () => {
+      if (!isPartnerAdmin || isImpersonatingStore) return;
+      
+      try {
+        const response = await api.get<{ results: Store[] }>('/stores/');
+        setStores(response.data.results);
+      } catch (error) {
+        console.error('Failed to fetch stores:', error);
+      }
+    };
+    
+    fetchStores();
+  }, [isPartnerAdmin, isImpersonatingStore]);
+
   // Fetch products
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const params = new URLSearchParams();
-      if (selectedStoreId) params.append('store_id', selectedStoreId.toString());
+      
+      // Determine which store to filter by
+      let filterStoreId = '';
+      if (effectiveStoreId) {
+        // Store-level user or impersonating store
+        filterStoreId = effectiveStoreId.toString();
+      } else if (storeFilter && storeFilter !== 'all') {
+        // Partner admin filtering by specific store
+        filterStoreId = storeFilter;
+      }
+      
+      if (filterStoreId) params.append('store_id', filterStoreId);
       const response = await api.get(`/inventory/products/${params.toString() ? `?${params.toString()}` : ''}`);
       const data = response.data as { results?: Product[] } | Product[];
       setProducts(Array.isArray(data) ? data : data.results || []);
@@ -76,11 +104,11 @@ function ProductsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [effectiveStoreId, storeFilter]);
 
   useEffect(() => {
     fetchProducts();
-  }, [selectedStoreId]);
+  }, [fetchProducts]);
 
   // Filter products based on all filters
   const filteredProducts = useMemo(() => {
@@ -125,8 +153,6 @@ function ProductsContent() {
       cost_price: product.cost_price,
       selling_price: product.selling_price,
       wholesale_price: product.wholesale_price || '',
-      current_stock: product.current_stock.toString(),
-      minimum_stock_level: product.minimum_stock_level.toString(),
       unit_of_measure: product.unit_of_measure,
       is_active: product.is_active,
     });
@@ -249,8 +275,6 @@ function ProductsContent() {
       cost_price: '',
       selling_price: '',
       wholesale_price: '',
-      current_stock: '0',
-      minimum_stock_level: '10',
       unit_of_measure: 'PIECE',
       is_active: true,
     });
@@ -275,8 +299,6 @@ function ProductsContent() {
       const data = {
         ...formData,
         category: parseInt(formData.category),
-        current_stock: parseInt(formData.current_stock) || 0,
-        minimum_stock_level: parseInt(formData.minimum_stock_level) || 10,
         barcode: formData.barcode || null,
         description: formData.description || '',
         wholesale_price: formData.wholesale_price || null,
@@ -321,19 +343,7 @@ function ProductsContent() {
     }
   };
 
-  const handleBarcodeSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && barcodeSearch.trim()) {
-      try {
-        const response = await api.get<Product>(`/inventory/products/barcode/${barcodeSearch.trim()}/`);
-        if (response.data) {
-          setGlobalFilter(response.data.name);
-        }
-      } catch {
-        alert('Product not found');
-      }
-      setBarcodeSearch('');
-    }
-  };
+
 
   if (loading) {
     return (
@@ -383,17 +393,25 @@ function ProductsContent() {
                 inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] focus-within:!border-[#049AE0] shadow-sm"
               }}
             />
-            <Input
-              placeholder="Scan barcode..."
-              value={barcodeSearch}
-              onChange={(e) => setBarcodeSearch(e.target.value)}
-              onKeyDown={handleBarcodeSearch}
-              className="w-full"
-              classNames={{
-                input: "text-sm focus:!outline-none",
-                inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] focus-within:!border-[#049AE0] shadow-sm"
-              }}
-            />
+            {isPartnerAdmin && !isImpersonatingStore && !effectiveStoreId && (
+              <Select
+                placeholder="All Stores"
+                selectedKeys={[storeFilter]}
+                onChange={(e) => setStoreFilter(e.target.value)}
+                className="w-full"
+                classNames={{
+                  trigger: "bg-white border border-gray-200 hover:border-[#049AE0] data-[hover=true]:bg-white shadow-sm",
+                  value: "text-sm"
+                }}
+              >
+                {[
+                  <SelectItem key="all">All Stores</SelectItem>,
+                  ...stores.map((store) => (
+                    <SelectItem key={store.id.toString()}>{store.name}</SelectItem>
+                  ))
+                ]}
+              </Select>
+            )}
             <Select
               placeholder="Category"
               selectedKeys={[categoryFilter]}
@@ -442,11 +460,12 @@ function ProductsContent() {
               <SelectItem key="out">Out of Stock</SelectItem>
             </Select>
           </div>
-          {(globalFilter || categoryFilter !== 'all' || statusFilter !== 'all' || stockFilter !== 'all') && (
+          {(globalFilter || storeFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all' || stockFilter !== 'all') && (
             <div className="mt-4">
               <button
                 onClick={() => {
                   setGlobalFilter('');
+                  setStoreFilter('all');
                   setCategoryFilter('all');
                   setStatusFilter('all');
                   setStockFilter('all');
@@ -623,17 +642,6 @@ function ProductsContent() {
                   onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
                   startContent={<span className="text-default-400">₱</span>}
                   placeholder="0.00 (optional)"
-                  classNames={{
-                    inputWrapper: "border-gray-200 hover:border-[#049AE0]"
-                  }}
-                />
-                <Input
-                  label="Minimum Stock Level"
-                  type="number"
-                  value={formData.minimum_stock_level}
-                  onChange={(e) => setFormData({ ...formData, minimum_stock_level: e.target.value })}
-                  isRequired
-                  placeholder="Reorder level"
                   classNames={{
                     inputWrapper: "border-gray-200 hover:border-[#049AE0]"
                   }}

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import api from '@/lib/api';
 import { useAuth } from './AuthContext';
 import type { Store } from '@/types';
@@ -18,8 +18,8 @@ interface StoreContextValue {
 const StoreContext = createContext<StoreContextValue | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const { user, impersonatedPartner, isImpersonating } = useAuth();
-  const partnerId = useMemo(() => impersonatedPartner?.id ?? user?.partner?.id ?? null, [impersonatedPartner, user]);
+  const { user, effectivePartnerId, effectiveStoreId, isImpersonatingStore } = useAuth();
+  const partnerId = effectivePartnerId;
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
@@ -40,6 +40,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ? response.data
         : response.data.results || [];
       setStores(fetchedStores);
+
+      // If impersonating a store, always use that store
+      if (isImpersonatingStore && effectiveStoreId) {
+        setSelectedStoreId(effectiveStoreId);
+        return;
+      }
 
       // Apply persisted selection when available
       const persistedId = storageKey ? localStorage.getItem(storageKey) : null;
@@ -75,18 +81,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setStores([]);
     setSelectedStoreId(null);
 
-    if (!partnerId || isImpersonating === undefined) return;
+    if (!partnerId) return;
 
-    const persistedId = storageKey ? localStorage.getItem(storageKey) : null;
-    if (persistedId) {
-      setSelectedStoreId(Number.parseInt(persistedId, 10));
+    // If impersonating a store, set it immediately
+    if (isImpersonatingStore && effectiveStoreId) {
+      setSelectedStoreId(effectiveStoreId);
+    } else {
+      const persistedId = storageKey ? localStorage.getItem(storageKey) : null;
+      if (persistedId) {
+        setSelectedStoreId(Number.parseInt(persistedId, 10));
+      }
     }
 
     refreshStores();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partnerId]);
+  }, [partnerId, isImpersonatingStore, effectiveStoreId]);
 
   const handleSetSelectedStore = (storeId: number | null) => {
+    // Don't allow changing store when impersonating
+    if (isImpersonatingStore) return;
+    
     setSelectedStoreId(storeId);
     if (storageKey) {
       if (storeId === null) {

@@ -7,7 +7,7 @@ import { Spinner } from '@heroui/react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles?: Array<'ADMIN' | 'INVENTORY_STAFF' | 'CASHIER' | 'VIEWER'>;
+  allowedRoles?: Array<'ADMIN' | 'STORE_ADMIN' | 'INVENTORY_STAFF' | 'CASHIER' | 'VIEWER'>;
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
