@@ -213,7 +213,7 @@ function SalesHistoryContent() {
         {/* Filters */}
         <Card className="mb-6">
           <CardBody className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               <Input
                 placeholder="Search by sale # or customer..."
                 value={searchQuery}
@@ -223,28 +223,42 @@ function SalesHistoryContent() {
                 }}
                 size="sm"
                 startContent={<span>🔍</span>}
+                classNames={{
+                  base: "w-full",
+                  inputWrapper: "h-10"
+                }}
               />
               
               <Input
                 type="date"
                 label="From Date"
+                labelPlacement="inside"
                 value={dateFrom}
                 onChange={(e) => {
                   setDateFrom(e.target.value);
                   setPage(1);
                 }}
                 size="sm"
+                classNames={{
+                  base: "w-full",
+                  inputWrapper: "h-10"
+                }}
               />
               
               <Input
                 type="date"
                 label="To Date"
+                labelPlacement="inside"
                 value={dateTo}
                 onChange={(e) => {
                   setDateTo(e.target.value);
                   setPage(1);
                 }}
                 size="sm"
+                classNames={{
+                  base: "w-full",
+                  inputWrapper: "h-10"
+                }}
               />
               
               <Select
@@ -255,13 +269,17 @@ function SalesHistoryContent() {
                   setPage(1);
                 }}
                 size="sm"
+                classNames={{
+                  base: "w-full",
+                  trigger: "h-10"
+                }}
               >
                 {PAYMENT_METHODS.map((method) => (
                   <SelectItem key={method.key}>{method.label}</SelectItem>
                 ))}
               </Select>
               
-              {showStoreFilter ? (
+              {showStoreFilter && (
                 <Select
                   placeholder="All Stores"
                   selectedKeys={selectedStoreId ? new Set([selectedStoreId]) : new Set()}
@@ -270,6 +288,10 @@ function SalesHistoryContent() {
                     setPage(1);
                   }}
                   size="sm"
+                  classNames={{
+                    base: "w-full",
+                    trigger: "h-10"
+                  }}
                 >
                   {[
                     <SelectItem key="">All Stores</SelectItem>,
@@ -278,29 +300,17 @@ function SalesHistoryContent() {
                     ))
                   ]}
                 </Select>
-              ) : (
-                <Button
-                  variant="flat"
-                  size="sm"
-                  onPress={handleClearFilters}
-                  className="h-full"
-                >
-                  Clear Filters
-                </Button>
               )}
+              
+              <Button
+                variant="flat"
+                size="sm"
+                onPress={handleClearFilters}
+                className="h-10 w-full"
+              >
+                Clear Filters
+              </Button>
             </div>
-            
-            {showStoreFilter && (
-              <div className="mt-3 flex justify-end">
-                <Button
-                  variant="flat"
-                  size="sm"
-                  onPress={handleClearFilters}
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            )}
           </CardBody>
         </Card>
 

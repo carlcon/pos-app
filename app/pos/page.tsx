@@ -54,6 +54,8 @@ function POSContent() {
   const [lastSale, setLastSale] = useState<{ sale_number: string; total: string } | null>(null);
   
   const { isOpen: isSuccessOpen, onOpen: onSuccessOpen, onClose: onSuccessClose } = useDisclosure();
+  const { isOpen: isOutOfStockOpen, onOpen: onOutOfStockOpen, onClose: onOutOfStockClose } = useDisclosure();
+  const [outOfStockProduct, setOutOfStockProduct] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus search input
@@ -67,8 +69,23 @@ function POSContent() {
   const total = Math.max(0, subtotal - discountAmount);
   const change = (parseFloat(amountPaid) || 0) - total;
 
-  // Add product to cart
-  const addToCart = useCallback((product: Product) => {
+  // Add product to cart - returns true if added, false if out of stock
+  const addToCart = useCallback((product: Product): boolean => {
+    // Check if product has no stock
+    if (product.current_stock <= 0) {
+      setOutOfStockProduct(product.name);
+      onOutOfStockOpen();
+      return false;
+    }
+    
+    // Check if already in cart and at max quantity
+    const existingItem = cart.find(item => item.product === product.id);
+    if (existingItem && existingItem.quantity >= product.current_stock) {
+      setOutOfStockProduct(product.name);
+      onOutOfStockOpen();
+      return false;
+    }
+    
     setCart(prev => {
       const existing = prev.find(item => item.product === product.id);
       
@@ -100,7 +117,8 @@ function POSContent() {
     setSearchQuery('');
     setSearchResults([]);
     searchInputRef.current?.focus();
-  }, []);
+    return true;
+  }, [cart, onOutOfStockOpen]);
 
   // Search products
   const searchProducts = useCallback(async (query: string) => {
@@ -194,7 +212,7 @@ function POSContent() {
   };
 
   // Submit sale
-  const handleSubmitSale = async () => {
+  const handleSubmitSale = useCallback(async () => {
     if (cart.length === 0) {
       alert('Cart is empty');
       return;
@@ -222,12 +240,20 @@ function POSContent() {
 
       const response = await api.post<{ sale_number: string; total_amount: string }>('/sales/', saleData);
       
+      // Store total before clearing cart
+      const saleTotal = response.data.total_amount || total.toFixed(2);
+      
       setLastSale({
         sale_number: response.data.sale_number,
-        total: response.data.total_amount,
+        total: saleTotal,
       });
       
-      clearCart();
+      // Clear cart after setting last sale
+      setCart([]);
+      setDiscount('0');
+      setCustomerName('');
+      setAmountPaid('');
+      
       onSuccessOpen();
     } catch (error) {
       console.error('Sale failed:', error);
@@ -235,20 +261,22 @@ function POSContent() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [cart, paymentMethod, change, customerName, discountAmount, effectiveStoreId, total, onSuccessOpen]);
 
   // F9 keyboard shortcut for completing sale
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'F9') {
         e.preventDefault();
-        handleSubmitSale();
+        if (cart.length > 0 && !(paymentMethod === 'CASH' && change < 0)) {
+          handleSubmitSale();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleSubmitSale]);
+  }, [handleSubmitSale, cart.length, paymentMethod, change]);
 
   // Check if POS is accessible - store admins have effectiveStoreId from assigned_store
   const canUsePOS = !!effectiveStoreId;
@@ -312,24 +340,41 @@ function POSContent() {
                 emptyContent: searching ? "Searching..." : "No products found"
               }}
             >
-              {(product) => (
-                <AutocompleteItem 
-                  key={product.id.toString()} 
-                  textValue={product.name}
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="flex-1">
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-default-500">
-                        SKU: {product.sku} | Stock: {product.current_stock}
+              {(product) => {
+                const cartItem = cart.find(item => item.product === product.id);
+                const availableStock = product.current_stock - (cartItem?.quantity || 0);
+                const isOutOfStock = product.current_stock <= 0;
+                const isMaxedOut = cartItem && cartItem.quantity >= product.current_stock;
+                
+                return (
+                  <AutocompleteItem 
+                    key={product.id.toString()} 
+                    textValue={product.name}
+                    className={isOutOfStock || isMaxedOut ? 'opacity-50' : ''}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1">
+                        <div className="font-medium flex items-center gap-2">
+                          {product.name}
+                          {isOutOfStock && (
+                            <Chip size="sm" color="danger" variant="flat">Out of Stock</Chip>
+                          )}
+                          {isMaxedOut && !isOutOfStock && (
+                            <Chip size="sm" color="warning" variant="flat">Max in Cart</Chip>
+                          )}
+                        </div>
+                        <div className="text-sm text-default-500">
+                          SKU: {product.sku} | Stock: {product.current_stock}
+                          {cartItem && ` | In Cart: ${cartItem.quantity}`}
+                        </div>
+                      </div>
+                      <div className="text-lg font-semibold text-primary ml-4">
+                        ₱{parseFloat(product.display_price).toFixed(2)}
                       </div>
                     </div>
-                    <div className="text-lg font-semibold text-primary ml-4">
-                      ₱{parseFloat(product.display_price).toFixed(2)}
-                    </div>
-                  </div>
-                </AutocompleteItem>
-              )}
+                  </AutocompleteItem>
+                );
+              }}
             </Autocomplete>
           </div>
 
@@ -488,10 +533,23 @@ function POSContent() {
                   </div>
                   
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="Enter amount"
                     value={amountPaid}
-                    onChange={(e) => setAmountPaid(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Only allow non-negative numbers
+                      if (value === '' || parseFloat(value) >= 0) {
+                        setAmountPaid(value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // Prevent minus sign
+                      if (e.key === '-' || e.key === 'e') {
+                        e.preventDefault();
+                      }
+                    }}
+                    min={0}
                     size="lg"
                     startContent={<span className="text-gray-400">₱</span>}
                     className="mb-2"
@@ -560,7 +618,17 @@ function POSContent() {
       </div>
 
       {/* Success Modal */}
-      <Modal isOpen={isSuccessOpen} onClose={onSuccessClose}>
+      <Modal 
+        isOpen={isSuccessOpen} 
+        onClose={onSuccessClose}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onSuccessClose();
+            searchInputRef.current?.focus();
+          }
+        }}
+      >
         <ModalContent>
           <ModalHeader className="text-center">
             <span className="text-4xl">✓</span>
@@ -581,6 +649,38 @@ function POSContent() {
               }}
             >
               New Transaction
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Out of Stock Modal */}
+      <Modal isOpen={isOutOfStockOpen} onClose={onOutOfStockClose} size="sm">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">⚠️</span>
+              <span>Insufficient Stock</span>
+            </div>
+          </ModalHeader>
+          <ModalBody>
+            <p className="text-gray-600">
+              <span className="font-semibold">{outOfStockProduct}</span> cannot be added to cart.
+            </p>
+            <p className="text-gray-500 text-sm mt-2">
+              Please add stock to this item first before selling.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              color="primary"
+              variant="flat"
+              onPress={() => {
+                onOutOfStockClose();
+                searchInputRef.current?.focus();
+              }}
+            >
+              OK
             </Button>
           </ModalFooter>
         </ModalContent>
