@@ -30,8 +30,9 @@ export function useStock(storeId?: number | null) {
       const response = await api.get<PaginatedResponse<StockTransaction>>(`/stock/transactions/?${params.toString()}`);
       setTransactions(response.data.results);
       setTotalCount(response.data.count);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch stock transactions');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to fetch stock transactions');
     } finally {
       setLoading(false);
     }

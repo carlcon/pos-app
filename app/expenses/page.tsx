@@ -75,7 +75,7 @@ function ExpensesContent() {
     amount: '',
     category: '',
     payment_method: 'CASH',
-    expense_date: today(getLocalTimeZone()) as any,
+    expense_date: today(getLocalTimeZone()),
     receipt_number: '',
     vendor: '',
     notes: '',
@@ -88,7 +88,7 @@ function ExpensesContent() {
       amount: '',
       category: '',
       payment_method: 'CASH',
-      expense_date: today(getLocalTimeZone()) as any,
+      expense_date: today(getLocalTimeZone()),
       receipt_number: '',
       vendor: '',
       notes: '',
@@ -142,7 +142,7 @@ function ExpensesContent() {
       amount: expense.amount,
       category: expense.category?.toString() || '',
       payment_method: expense.payment_method,
-      expense_date: parseDate(expense.expense_date) as any,
+      expense_date: parseDate(expense.expense_date),
       receipt_number: expense.receipt_number,
       vendor: expense.vendor,
       notes: expense.notes,
@@ -230,7 +230,7 @@ function ExpensesContent() {
         <DatePicker
           label="Date"
           value={formData.expense_date}
-          onChange={(date) => setFormData({ ...formData, expense_date: date as any })}
+          onChange={(date) => date && setFormData({ ...formData, expense_date: date })}
           isRequired
           classNames={{
             base: "w-full",

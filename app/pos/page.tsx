@@ -41,7 +41,7 @@ const PAYMENT_METHODS = [
 ];
 
 function POSContent() {
-  const { user, effectiveStoreId, isCashier, isImpersonatingStore } = useAuth();
+  const { user, effectiveStoreId, isCashier } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
@@ -342,7 +342,6 @@ function POSContent() {
             >
               {(product) => {
                 const cartItem = cart.find(item => item.product === product.id);
-                const availableStock = product.current_stock - (cartItem?.quantity || 0);
                 const isOutOfStock = product.current_stock <= 0;
                 const isMaxedOut = cartItem && cartItem.quantity >= product.current_stock;
                 

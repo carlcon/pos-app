@@ -18,7 +18,7 @@ interface StoreContextValue {
 const StoreContext = createContext<StoreContextValue | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const { user, effectivePartnerId, effectiveStoreId, isImpersonatingStore, isPartnerAdmin, isStoreLevelUser } = useAuth();
+  const { user, effectivePartnerId, effectiveStoreId, isImpersonatingStore, isStoreLevelUser } = useAuth();
   const partnerId = effectivePartnerId;
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(false);

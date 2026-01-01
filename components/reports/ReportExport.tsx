@@ -146,7 +146,7 @@ export function ReportExport({ reportType, reportName, filters }: ReportExportPr
         const headers = Object.keys(items[0]);
         csvContent += headers.join(',') + '\n';
 
-        items.forEach((item: Record<string, any>) => {
+        items.forEach((item: Record<string, unknown>) => {
           const row = headers.map(h => {
             const val = item[h];
             if (typeof val === 'string' && val.includes(',')) {

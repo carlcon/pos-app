@@ -14,10 +14,10 @@ export function useCategories(storeId?: number | null) {
       const params = new URLSearchParams();
       if (storeId) params.append('store_id', storeId.toString());
       const response = await api.get(`/inventory/categories/${params.toString() ? `?${params.toString()}` : ''}`);
-      const data = response.data as any;
+      const data = response.data as { results?: Category[] } | Category[];
       // Handle both paginated and non-paginated responses
-      setCategories(data.results || data);
-    } catch (err: any) {
+      setCategories(Array.isArray(data) ? data : (data.results || []));
+    } catch (err: unknown) {
       setError(err.response?.data?.message || 'Failed to fetch categories');
       setCategories([]);
     } finally {

@@ -77,8 +77,9 @@ export function useDashboard(enabled = true, storeId?: number | null) {
       if (storeId) params.append('store_id', storeId.toString());
       const response = await api.get<DashboardStats>(`/dashboard/stats/${params.toString() ? `?${params.toString()}` : ''}`);
       setStats(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch dashboard data');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to fetch dashboard data');
     } finally {
       setLoading(false);
     }

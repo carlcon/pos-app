@@ -274,7 +274,7 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   error?: string;
   detail?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Report types
@@ -296,13 +296,13 @@ export interface ReportFilters {
   page_size?: number;
 }
 
-export interface PaginatedReportData<T = any> {
+export interface PaginatedReportData<T = unknown> {
   report_type: string;
   generated_at?: string;
   period?: string;
   start_date?: string;
   end_date?: string;
-  summary: Record<string, any>;
+  summary: Record<string, unknown>;
   data: T[];
   count: number;
   page: number;

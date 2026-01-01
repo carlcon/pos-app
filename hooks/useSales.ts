@@ -34,8 +34,9 @@ export function useSales(storeId?: number | null) {
       const response = await api.get<PaginatedResponse<Sale>>(`/sales/?${params.toString()}`);
       setSales(response.data.results);
       setTotalCount(response.data.count);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch sales');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to fetch sales');
     } finally {
       setLoading(false);
     }

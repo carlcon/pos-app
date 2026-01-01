@@ -32,8 +32,9 @@ export function useProducts(options: UseProductsOptions = {}, storeId?: number |
       const response = await api.get<PaginatedResponse<Product>>(`/inventory/products/?${params}`);
       setProducts(response.data.results);
       setTotalCount(response.data.count);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch products');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to fetch products');
     } finally {
       setLoading(false);
     }

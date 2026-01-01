@@ -14,7 +14,7 @@ import type { ReportColumn } from '@/types';
 
 interface ReportTableProps {
   reportType: string;
-  data: any[];
+  data: Record<string, unknown>[];
   loading?: boolean;
   sortDescriptor?: { column: string; direction: 'ascending' | 'descending' };
   onSortChange?: (descriptor: { column: string; direction: 'ascending' | 'descending' }) => void;
@@ -132,7 +132,7 @@ const COLUMN_CONFIGS: Record<string, ReportColumn[]> = {
   ],
 };
 
-function formatCellValue(value: any, format?: string): string {
+function formatCellValue(value: unknown, format?: string): string {
   if (value === null || value === undefined) return '-';
   
   // If value is already a formatted string (contains currency symbol or percentage), return as-is
@@ -185,7 +185,7 @@ export function ReportTable({
       <Table
         aria-label="Report data table"
         sortDescriptor={sortDescriptor}
-        onSortChange={onSortChange as any}
+        onSortChange={onSortChange as (descriptor: { column: string; direction: 'ascending' | 'descending' }) => void}
         classNames={{
           wrapper: 'min-w-full',
           table: 'min-w-full',
@@ -203,13 +203,13 @@ export function ReportTable({
           )}
         </TableHeader>
         <TableBody
-          items={data}
+          items={data.map((item, idx) => ({ ...item, _idx: idx }))}
           isLoading={loading}
           loadingContent={<Spinner label="Loading..." />}
           emptyContent="No data available"
         >
           {(item) => (
-            <TableRow key={item.id || `row-${Math.random()}`}>
+            <TableRow key={item.id ? String(item.id) : `row-${item._idx}`}>
               {(columnKey) => {
                 const column = columns.find((c) => c.key === columnKey);
                 const value = item[columnKey];
