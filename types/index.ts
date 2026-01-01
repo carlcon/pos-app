@@ -276,3 +276,46 @@ export interface ApiError {
   detail?: string;
   [key: string]: any;
 }
+
+// Report types
+export interface ReportFilters {
+  date?: string;
+  date_from?: string;
+  date_to?: string;
+  category?: string;
+  payment_method?: string;
+  days?: number;
+  limit?: number;
+  period?: string;
+  store_id?: number;
+  search?: string;
+  status?: string;
+  transaction_type?: string;
+  vendor?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface PaginatedReportData<T = any> {
+  report_type: string;
+  generated_at?: string;
+  period?: string;
+  start_date?: string;
+  end_date?: string;
+  summary: Record<string, any>;
+  data: T[];
+  count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+}
+
+export interface ReportColumn {
+  key: string;
+  label: string;
+  sortable?: boolean;
+  format?: 'currency' | 'number' | 'date' | 'datetime' | 'percentage' | 'text';
+  align?: 'start' | 'center' | 'end';
+}

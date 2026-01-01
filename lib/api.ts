@@ -37,11 +37,17 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       if (typeof window !== 'undefined') {
-        // Clear tokens and redirect to login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Don't redirect if we're already on login page or if this is a login request
+        const isLoginRequest = originalRequest.url?.includes('/auth/login');
+        const isOnLoginPage = window.location.pathname === '/login';
+        
+        if (!isLoginRequest && !isOnLoginPage) {
+          // Clear tokens and redirect to login
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
       }
     }
 

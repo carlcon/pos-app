@@ -63,7 +63,7 @@ function ProductsContent() {
   // Fetch stores for partner admins
   useEffect(() => {
     const fetchStores = async () => {
-      if (!isPartnerAdmin || isImpersonatingStore) return;
+      if (!isPartnerAdmin) return;
       
       try {
         const response = await api.get<{ results: Store[] }>('/stores/');
@@ -74,7 +74,7 @@ function ProductsContent() {
     };
     
     fetchStores();
-  }, [isPartnerAdmin, isImpersonatingStore]);
+  }, [isPartnerAdmin]);
 
   // Fetch products
   const fetchProducts = useCallback(async () => {
@@ -393,7 +393,7 @@ function ProductsContent() {
                 inputWrapper: "bg-white border border-gray-200 hover:border-[#049AE0] focus-within:!border-[#049AE0] shadow-sm"
               }}
             />
-            {isPartnerAdmin && !isImpersonatingStore && !effectiveStoreId && (
+            {isPartnerAdmin && !effectiveStoreId && (
               <Select
                 placeholder="All Stores"
                 selectedKeys={[storeFilter]}

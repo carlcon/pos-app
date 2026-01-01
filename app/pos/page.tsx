@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Button,
   Input,
-  Spinner,
   Divider,
   Select,
   SelectItem,
@@ -15,10 +14,11 @@ import {
   ModalFooter,
   useDisclosure,
   Chip,
+  Autocomplete,
+  AutocompleteItem,
 } from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
-import BarcodeInput from '@/components/BarcodeInput';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import type { Product, SaleItem } from '@/types';
@@ -67,44 +67,8 @@ function POSContent() {
   const total = Math.max(0, subtotal - discountAmount);
   const change = (parseFloat(amountPaid) || 0) - total;
 
-  // Search products
-  const searchProducts = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      setSearching(true);
-      const params: Record<string, string> = { search: query };
-      if (effectiveStoreId) {
-        params.store_id = effectiveStoreId.toString();
-      }
-      
-      const response = await api.get<{ results: Product[] }>('/products/', { params });
-      const products = response.data.results.map(p => ({
-        ...p,
-        display_price: p.selling_price,
-      }));
-      setSearchResults(products.slice(0, 10));
-    } catch (error) {
-      console.error('Product search failed:', error);
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, [effectiveStoreId]);
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchProducts(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, searchProducts]);
-
   // Add product to cart
-  const addToCart = (product: Product) => {
+  const addToCart = useCallback((product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.product === product.id);
       
@@ -136,6 +100,72 @@ function POSContent() {
     setSearchQuery('');
     setSearchResults([]);
     searchInputRef.current?.focus();
+  }, []);
+
+  // Search products
+  const searchProducts = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setSearching(true);
+      const params: Record<string, string> = { search: query };
+      if (effectiveStoreId) {
+        params.store_id = effectiveStoreId.toString();
+      }
+      
+      const response = await api.get<{ results: Product[] }>('/inventory/products/', { params });
+      const products = response.data.results.map(p => ({
+        ...p,
+        display_price: p.selling_price,
+      }));
+      
+      setSearchResults(products.slice(0, 10));
+    } catch (error) {
+      console.error('Product search failed:', error);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, [effectiveStoreId]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchProducts(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchProducts]);
+
+  // Handle Enter key for barcode scanner
+  const handleBarcodeEnter = async (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      e.preventDefault();
+      
+      // Immediately search for exact barcode match
+      try {
+        const params: Record<string, string> = { search: searchQuery };
+        if (effectiveStoreId) {
+          params.store_id = effectiveStoreId.toString();
+        }
+        
+        const response = await api.get<{ results: Product[] }>('/inventory/products/', { params });
+        const products = response.data.results;
+        
+        // Check for exact barcode match
+        const exactMatch = products.find(p => p.barcode === searchQuery);
+        if (exactMatch) {
+          addToCart(exactMatch);
+        } else if (products.length === 1) {
+          // If only one result, add it
+          addToCart(products[0]);
+        }
+      } catch (error) {
+        console.error('Barcode search failed:', error);
+      }
+    }
   };
 
   // Update cart item quantity
@@ -207,8 +237,21 @@ function POSContent() {
     }
   };
 
-  // Check if POS is accessible
-  const canUsePOS = effectiveStoreId || isImpersonatingStore;
+  // F9 keyboard shortcut for completing sale
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'F9') {
+        e.preventDefault();
+        handleSubmitSale();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [handleSubmitSale]);
+
+  // Check if POS is accessible - store admins have effectiveStoreId from assigned_store
+  const canUsePOS = !!effectiveStoreId;
 
   if (!canUsePOS) {
     return (
@@ -227,18 +270,13 @@ function POSContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Minimal navbar for cashiers */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Custom Header for Cashiers */}
       {isCashier ? (
-        <div className="bg-white border-b px-6 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-[#049AE0] to-[#0B7FBF] rounded-lg flex items-center justify-center text-white font-bold">
-              P
-            </div>
-            <span className="font-semibold text-lg">POS Terminal</span>
-          </div>
+        <div className="h-16 bg-white border-b flex items-center justify-between px-6">
           <div className="flex items-center gap-4">
-            <Chip size="sm" color="success" variant="flat">
+            <h1 className="text-xl font-bold text-primary">POS System</h1>
+            <Chip color="primary" variant="flat">
               {user?.assigned_store?.name || 'Store'}
             </Chip>
             <span className="text-sm text-gray-600">{user?.username}</span>
@@ -253,55 +291,46 @@ function POSContent() {
         <div className="flex-1 flex flex-col p-4 overflow-hidden">
           {/* Search */}
           <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Input
-                  ref={searchInputRef}
-                  placeholder="Search products or scan barcode..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  size="lg"
-                  startContent={<span>🔍</span>}
-                  className="text-lg"
-                />
-              </div>
-              <div className="w-64">
-                <BarcodeInput 
-                  onProductFound={addToCart} 
-                  label=""
-                  placeholder="Scan barcode..."
-                  autoFocus={false}
-                />
-              </div>
-            </div>
-            
-            {/* Search Results Dropdown */}
-            {searchResults.length > 0 && (
-              <div className="absolute z-50 mt-2 w-[calc(100%-2rem)] max-w-2xl bg-white border rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                {searchResults.map((product) => (
-                  <button
-                    key={product.id}
-                    className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50 border-b last:border-b-0"
-                    onClick={() => addToCart(product)}
-                  >
-                    <div className="text-left">
+            <Autocomplete
+              ref={searchInputRef}
+              placeholder="Search products or scan barcode..."
+              inputValue={searchQuery}
+              onInputChange={setSearchQuery}
+              onKeyDown={handleBarcodeEnter}
+              onSelectionChange={(key) => {
+                if (key) {
+                  const product = searchResults.find(p => p.id.toString() === key);
+                  if (product) addToCart(product);
+                }
+              }}
+              items={searchResults}
+              isLoading={searching}
+              size="lg"
+              startContent={<span>🔍</span>}
+              className="text-lg"
+              listboxProps={{
+                emptyContent: searching ? "Searching..." : "No products found"
+              }}
+            >
+              {(product) => (
+                <AutocompleteItem 
+                  key={product.id.toString()} 
+                  textValue={product.name}
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
                       <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-default-500">
                         SKU: {product.sku} | Stock: {product.current_stock}
                       </div>
                     </div>
-                    <div className="text-lg font-semibold text-primary">
+                    <div className="text-lg font-semibold text-primary ml-4">
                       ₱{parseFloat(product.display_price).toFixed(2)}
                     </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            {searching && (
-              <div className="absolute z-50 mt-2 w-full bg-white border rounded-lg shadow-lg p-4 text-center">
-                <Spinner size="sm" />
-              </div>
-            )}
+                  </div>
+                </AutocompleteItem>
+              )}
+            </Autocomplete>
           </div>
 
           {/* Cart Items */}
@@ -325,7 +354,7 @@ function POSContent() {
               ) : (
                 <div className="divide-y">
                   {cart.map((item) => (
-                    <div key={item.product} className="p-4 flex items-center gap-4">
+                    <div key={item.product} className="p-4 flex  items-center gap-4">
                       <div className="flex-1">
                         <div className="font-medium">{item.product_name}</div>
                         <div className="text-sm text-gray-500">
@@ -382,17 +411,18 @@ function POSContent() {
         </div>
 
         {/* Right Panel - Payment */}
-        <div className="w-96 bg-white border-l flex flex-col">
-          <div className="p-6 flex-1 flex flex-col">
-            <h2 className="text-xl font-semibold mb-4">Payment</h2>
+        <div className="w-[420px] bg-white border-l border-gray-200 flex flex-col">
+          <div className="p-5 flex-1 flex flex-col overflow-y-auto">
+            <h2 className="text-xl font-semibold mb-3 pb-2 border-b border-gray-200">Payment</h2>
             
             {/* Customer */}
             <Input
               label="Customer Name (Optional)"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="mb-4"
+              className="mb-3"
               placeholder="Walk-in customer"
+              size="sm"
             />
             
             {/* Payment Method */}
@@ -400,7 +430,8 @@ function POSContent() {
               label="Payment Method"
               selectedKeys={new Set([paymentMethod])}
               onSelectionChange={(keys) => setPaymentMethod(Array.from(keys)[0] as string)}
-              className="mb-4"
+              className="mb-3"
+              size="sm"
             >
               {PAYMENT_METHODS.map((method) => (
                 <SelectItem key={method.key}>{method.label}</SelectItem>
@@ -413,15 +444,16 @@ function POSContent() {
               label="Discount (₱)"
               value={discount}
               onChange={(e) => setDiscount(e.target.value)}
-              className="mb-4"
+              className="mb-3"
               min={0}
               max={subtotal}
+              size="sm"
             />
             
-            <Divider className="my-4" />
+            <Divider className="my-3" />
             
             {/* Totals */}
-            <div className="space-y-2 mb-4">
+            <div className="space-y-2 mb-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
                 <span>₱{subtotal.toFixed(2)}</span>
@@ -441,25 +473,74 @@ function POSContent() {
             {/* Amount Paid (for cash) */}
             {paymentMethod === 'CASH' && (
               <>
-                <Input
-                  type="number"
-                  label="Amount Paid"
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(e.target.value)}
-                  className="mb-2"
-                  size="lg"
-                  startContent={<span className="text-gray-400">₱</span>}
-                />
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Amount Received</label>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      color="danger"
+                      onPress={() => setAmountPaid('')}
+                      className="h-6 min-w-12"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  
+                  <Input
+                    type="number"
+                    placeholder="Enter amount"
+                    value={amountPaid}
+                    onChange={(e) => setAmountPaid(e.target.value)}
+                    size="lg"
+                    startContent={<span className="text-gray-400">₱</span>}
+                    className="mb-2"
+                    classNames={{
+                      input: "text-2xl font-bold",
+                      inputWrapper: "border border-gray-300"
+                    }}
+                  />
+                  
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500 uppercase font-medium mb-1">Quick Add</div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[20, 50, 100, 200, 500, 1000].map(amount => (
+                        <Button
+                          key={amount}
+                          size="sm"
+                          variant="bordered"
+                          color="primary"
+                          onPress={() => {
+                            const current = parseFloat(amountPaid) || 0;
+                            setAmountPaid((current + amount).toString());
+                          }}
+                          className="font-semibold h-10"
+                        >
+                          +₱{amount}
+                        </Button>
+                      ))}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="success"
+                      onPress={() => setAmountPaid(total.toFixed(2))}
+                      className="w-full font-semibold h-10"
+                    >
+                      Exact (₱{total.toFixed(2)})
+                    </Button>
+                  </div>
+                </div>
                 {amountPaid && (
-                  <div className={`flex justify-between text-lg font-semibold mb-4 ${change >= 0 ? 'text-success' : 'text-danger'}`}>
-                    <span>Change</span>
-                    <span>₱{change.toFixed(2)}</span>
+                  <div className={`flex justify-between items-center text-lg font-semibold mb-3 p-3 rounded-lg border ${change >= 0 ? 'bg-success-50 border-success-200' : 'bg-danger-50 border-danger-200'}`}>
+                    <span className={change >= 0 ? 'text-success-700' : 'text-danger-700'}>Change</span>
+                    <span className={`text-2xl font-bold ${change >= 0 ? 'text-success-700' : 'text-danger-700'}`}>₱{Math.abs(change).toFixed(2)}</span>
                   </div>
                 )}
               </>
             )}
             
-            <div className="mt-auto">
+            <div className="mt-auto pt-2">
               <Button
                 color="primary"
                 size="lg"
@@ -468,7 +549,10 @@ function POSContent() {
                 isLoading={isSubmitting}
                 isDisabled={cart.length === 0 || (paymentMethod === 'CASH' && change < 0)}
               >
-                Complete Sale - ₱{total.toFixed(2)}
+                <div className="flex flex-col items-center">
+                  <span>Complete Sale - ₱{total.toFixed(2)}</span>
+                  <span className="text-xs opacity-80">Press F9</span>
+                </div>
               </Button>
             </div>
           </div>

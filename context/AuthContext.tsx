@@ -52,7 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedStoreImpersonation = localStorage.getItem('impersonated_store');
         
         if (storedUser && accessToken) {
-          setUser(JSON.parse(storedUser));
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
           
           // Load cached impersonation state
           if (storedPartnerImpersonation) {
@@ -81,7 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setImpersonatedStore(null);
               localStorage.removeItem('impersonated_store');
             }
-          } catch {
+          } catch (error) {
+            console.error('Failed to verify impersonation status:', error);
             // Ignore errors - likely not authenticated or server unavailable
           }
         }
@@ -300,7 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Computed values
   const isSuperAdmin = user?.is_super_admin ?? false;
-  const isPartnerAdmin = user?.role === 'ADMIN' && !isSuperAdmin;
+  const isPartnerAdmin = (user?.role === 'ADMIN' && !isSuperAdmin) || !!impersonatedPartner;
   const isStoreAdmin = user?.role === 'STORE_ADMIN';
   const isCashier = user?.role === 'CASHIER';
   const isStoreLevelUser = isStoreAdmin || isCashier;

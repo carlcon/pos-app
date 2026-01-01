@@ -1,239 +1,50 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  Card,
-  CardBody,
-  Button,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
-  Spinner,
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  Chip,
-  addToast,
-} from '@heroui/react';
+import { useRouter } from 'next/navigation';
+import { Card, CardBody, Button } from '@heroui/react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Navbar } from '@/components/Navbar';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useStore } from '@/context/StoreContext';
-import api from '@/lib/api';
 
-interface ReportData {
-  report_type: string;
-  [key: string]: unknown;
+interface ReportButton {
+  endpoint: string;
+  name: string;
+  icon: string;
 }
 
+const REPORT_TYPES: Record<string, ReportButton[]> = {
+  'Sales Reports': [
+    { endpoint: 'daily-sales', name: 'Daily Sales Report', icon: '📊' },
+    { endpoint: 'weekly-sales', name: 'Weekly Sales Summary', icon: '📈' },
+    { endpoint: 'monthly-revenue', name: 'Monthly Revenue Analysis', icon: '📉' },
+    { endpoint: 'payment-breakdown', name: 'Payment Method Breakdown', icon: '💳' },
+  ],
+  'Inventory Reports': [
+    { endpoint: 'stock-levels', name: 'Stock Levels Report', icon: '📦' },
+    { endpoint: 'low-stock', name: 'Low Stock Alert Report', icon: '⚠️' },
+    { endpoint: 'stock-movement', name: 'Stock Movement History', icon: '🔄' },
+    { endpoint: 'inventory-valuation', name: 'Inventory Valuation', icon: '💰' },
+  ],
+  'Product Reports': [
+    { endpoint: 'top-selling', name: 'Top Selling Products', icon: '🏆' },
+    { endpoint: 'products-by-category', name: 'Products by Category', icon: '📦' },
+  ],
+  'Expense Reports': [
+    { endpoint: 'monthly-expenses', name: 'Monthly Expenses Analysis', icon: '📊' },
+    { endpoint: 'expenses-by-category', name: 'Expenses by Category', icon: '📂' },
+    { endpoint: 'expenses-by-vendor', name: 'Expenses by Vendor', icon: '🏢' },
+    { endpoint: 'expense-transactions', name: 'Expense Transactions', icon: '📋' },
+  ],
+};
+
 function ReportsContent() {
+  const router = useRouter();
   const { selectedStoreId } = useStore();
   const { stats } = useDashboard(true, selectedStoreId);
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [currentReport, setCurrentReport] = useState('');
 
-  const fetchReport = async (endpoint: string, reportName: string) => {
-    setReportLoading(true);
-    setCurrentReport(reportName);
-    try {
-      const params = new URLSearchParams();
-      if (selectedStoreId) params.append('store_id', selectedStoreId.toString());
-      const response = await api.get(`/dashboard/reports/${endpoint}/${params.toString() ? `?${params.toString()}` : ''}`);
-      setReportData(response.data as ReportData);
-      onOpen();
-    } catch (error) {
-      console.error('Error fetching report:', error);
-      addToast({
-        title: 'Error',
-        description: 'Failed to fetch report data',
-        color: 'danger',
-      });
-    } finally {
-      setReportLoading(false);
-    }
-  };
-
-  const exportToCSV = () => {
-    if (!reportData) return;
-
-    let csvContent = '';
-    const reportType = reportData.report_type || 'Report';
-
-    // Add header
-    csvContent += `${reportType}\n`;
-    csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
-
-    // Add summary if exists
-    if (reportData.summary && typeof reportData.summary === 'object') {
-      csvContent += 'Summary\n';
-      Object.entries(reportData.summary as Record<string, unknown>).forEach(([key, value]) => {
-        csvContent += `${key.replace(/_/g, ' ')},${value}\n`;
-      });
-      csvContent += '\n';
-    }
-
-    // Find array data to export
-    const arrayKeys = Object.keys(reportData).filter(
-      key => Array.isArray(reportData[key]) && (reportData[key] as unknown[]).length > 0
-    );
-
-    arrayKeys.forEach(key => {
-      const items = reportData[key] as Record<string, unknown>[];
-      if (items.length > 0) {
-        csvContent += `${key.replace(/_/g, ' ').toUpperCase()}\n`;
-        
-        // Headers
-        const headers = Object.keys(items[0]);
-        csvContent += headers.join(',') + '\n';
-        
-        // Data rows
-        items.forEach(item => {
-          const row = headers.map(h => {
-            const val = item[h];
-            if (typeof val === 'string' && val.includes(',')) {
-              return `"${val}"`;
-            }
-            return val;
-          });
-          csvContent += row.join(',') + '\n';
-        });
-        csvContent += '\n';
-      }
-    });
-
-    // Download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${reportType.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-
-    addToast({
-      title: 'Export Successful',
-      description: 'CSV file has been downloaded',
-      color: 'success',
-    });
-  };
-
-  const exportToJSON = () => {
-    if (!reportData) return;
-
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${(reportData.report_type || 'Report').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-
-    addToast({
-      title: 'Export Successful',
-      description: 'JSON file has been downloaded',
-      color: 'success',
-    });
-  };
-
-  const printReport = () => {
-    window.print();
-  };
-
-  const renderReportContent = () => {
-    if (!reportData) return null;
-
-    const summary = reportData.summary as Record<string, unknown> | undefined;
-
-    return (
-      <div className="space-y-6 print:space-y-4">
-        {/* Summary */}
-        {summary && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(summary).map(([key, value]) => (
-              <div key={key} className="bg-default-100 p-4 rounded-lg">
-                <p className="text-xs text-default-500 capitalize">{key.replace(/_/g, ' ')}</p>
-                <p className="text-lg font-semibold">
-                  {typeof value === 'number' 
-                    ? (key.includes('revenue') || key.includes('value') || key.includes('cost') || key.includes('price') || key.includes('profit')) && !key.includes('count') && !key.includes('quantity') && !key.includes('units') && !key.includes('products')
-                      ? `₱${value.toFixed(2)}`
-                      : key.includes('percentage')
-                        ? `${value.toFixed(1)}%`
-                        : value.toLocaleString()
-                    : String(value)
-                  }
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Data Tables */}
-        {Object.entries(reportData).map(([key, value]) => {
-          if (!Array.isArray(value) || value.length === 0) return null;
-          if (key === 'report_type' || key === 'summary') return null;
-
-          const items = value as Record<string, unknown>[];
-          const columns = Object.keys(items[0]).filter(col => 
-            !col.includes('id') || col === 'id'
-          ).slice(0, 8); // Limit columns for display
-
-          return (
-            <div key={key} className="overflow-x-auto">
-              <h4 className="text-sm font-semibold mb-2 capitalize">{key.replace(/_/g, ' ')}</h4>
-              <Table aria-label={key} isStriped>
-                <TableHeader>
-                  {columns.map(col => (
-                    <TableColumn key={col} className="capitalize text-xs">
-                      {col.replace(/_/g, ' ')}
-                    </TableColumn>
-                  ))}
-                </TableHeader>
-                <TableBody>
-                  {items.slice(0, 50).map((item, idx) => (
-                    <TableRow key={idx}>
-                      {columns.map(col => (
-                        <TableCell key={col} className="text-sm">
-                          {col === 'status' ? (
-                            <Chip
-                              size="sm"
-                              color={
-                                item[col] === 'OK' ? 'success' :
-                                item[col] === 'Low Stock' ? 'warning' :
-                                item[col] === 'Out of Stock' ? 'danger' : 'default'
-                              }
-                              variant="flat"
-                            >
-                              {String(item[col])}
-                            </Chip>
-                          ) : typeof item[col] === 'number' ? (
-                            (col.includes('price') || col.includes('value') || col.includes('revenue') || col.includes('cost') || col.includes('profit')) && !col.includes('count') && !col.includes('quantity') && !col.includes('stock') && !col.includes('units') && !col.includes('sold')
-                              ? `₱${(item[col] as number).toFixed(2)}`
-                              : col.includes('percentage')
-                                ? `${(item[col] as number).toFixed(1)}%`
-                                : (item[col] as number).toLocaleString()
-                          ) : (
-                            String(item[col] ?? '-')
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {items.length > 50 && (
-                <p className="text-xs text-default-500 mt-2">
-                  Showing 50 of {items.length} items. Export to see all data.
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
+  const handleReportClick = (endpoint: string) => {
+    router.push(`/reports/${endpoint}`);
   };
 
   return (
@@ -242,153 +53,32 @@ function ReportsContent() {
       <div className="p-4 sm:p-6 lg:p-8 xl:p-12 space-y-4 sm:space-y-6 xl:space-y-8">
         <div>
           <h1 className="text-2xl sm:text-3xl xl:text-4xl font-bold text-foreground">Reports</h1>
-          <p className="text-sm sm:text-base xl:text-lg text-default-500 mt-1">Business analytics and insights</p>
+          <p className="text-sm sm:text-base xl:text-lg text-default-500 mt-1">
+            Select a report to view data, apply filters, and export to PDF or CSV
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 xl:gap-8">
-          <Card>
-            <CardBody className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Sales Reports</h3>
-              <div className="space-y-3">
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('daily-sales', 'Daily Sales Report')}
-                  isLoading={reportLoading && currentReport === 'Daily Sales Report'}
-                >
-                  📊 Daily Sales Report
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('weekly-sales', 'Weekly Sales Summary')}
-                  isLoading={reportLoading && currentReport === 'Weekly Sales Summary'}
-                >
-                  📈 Weekly Sales Summary
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('monthly-revenue', 'Monthly Revenue Analysis')}
-                  isLoading={reportLoading && currentReport === 'Monthly Revenue Analysis'}
-                >
-                  📉 Monthly Revenue Analysis
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('payment-breakdown', 'Payment Method Breakdown')}
-                  isLoading={reportLoading && currentReport === 'Payment Method Breakdown'}
-                >
-                  💳 Payment Method Breakdown
-                </Button>
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Inventory Reports</h3>
-              <div className="space-y-3">
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('stock-levels', 'Stock Levels Report')}
-                  isLoading={reportLoading && currentReport === 'Stock Levels Report'}
-                >
-                  📦 Stock Levels Report
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('low-stock', 'Low Stock Alert Report')}
-                  isLoading={reportLoading && currentReport === 'Low Stock Alert Report'}
-                >
-                  ⚠️ Low Stock Alert Report
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('stock-movement', 'Stock Movement History')}
-                  isLoading={reportLoading && currentReport === 'Stock Movement History'}
-                >
-                  🔄 Stock Movement History
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('inventory-valuation', 'Inventory Valuation')}
-                  isLoading={reportLoading && currentReport === 'Inventory Valuation'}
-                >
-                  💰 Inventory Valuation
-                </Button>
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Product Reports</h3>
-              <div className="space-y-3">
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('top-selling', 'Top Selling Products')}
-                  isLoading={reportLoading && currentReport === 'Top Selling Products'}
-                >
-                  🏆 Top Selling Products
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('products-by-category', 'Products by Category')}
-                  isLoading={reportLoading && currentReport === 'Products by Category'}
-                >
-                  📦 Products by Category
-                </Button>
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Expense Reports</h3>
-              <div className="space-y-3">
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('monthly-expenses', 'Monthly Expenses Analysis')}
-                  isLoading={reportLoading && currentReport === 'Monthly Expenses Analysis'}
-                >
-                  📊 Monthly Expenses Analysis
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('expenses-by-category', 'Expenses by Category')}
-                  isLoading={reportLoading && currentReport === 'Expenses by Category'}
-                >
-                  📂 Expenses by Category
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('expenses-by-vendor', 'Expenses by Vendor')}
-                  isLoading={reportLoading && currentReport === 'Expenses by Vendor'}
-                >
-                  🏢 Expenses by Vendor
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="flat"
-                  onPress={() => fetchReport('expense-transactions', 'Expense Transactions')}
-                  isLoading={reportLoading && currentReport === 'Expense Transactions'}
-                >
-                  📋 Expense Transactions
-                </Button>
-              </div>
-            </CardBody>
-          </Card>
+          {Object.entries(REPORT_TYPES).map(([category, reports]) => (
+            <Card key={category}>
+              <CardBody className="p-6">
+                <h3 className="text-lg font-semibold mb-4">{category}</h3>
+                <div className="space-y-3">
+                  {reports.map((report) => (
+                    <Button
+                      key={report.endpoint}
+                      className="w-full justify-start"
+                      variant="flat"
+                      onPress={() => handleReportClick(report.endpoint)}
+                    >
+                      <span className="mr-2">{report.icon}</span>
+                      {report.name}
+                    </Button>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ))}
 
           <Card>
             <CardBody className="p-6">
@@ -413,59 +103,13 @@ function ReportsContent() {
                 <div className="flex justify-between p-3 bg-default-50 rounded">
                   <span className="text-default-600">Inventory Value:</span>
                   <span className="font-semibold text-success">
-                    ₱{stats ? parseFloat(stats.total_inventory_value.value).toFixed(2) : '0.00'}
+                    ₱{stats ? parseFloat(stats.total_inventory_value.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                   </span>
                 </div>
               </div>
             </CardBody>
           </Card>
         </div>
-
-        {/* Report Modal */}
-        <Modal 
-          isOpen={isOpen} 
-          onClose={onClose} 
-          size="5xl" 
-          scrollBehavior="inside"
-          classNames={{
-            base: "max-h-[90vh]",
-            body: "py-6"
-          }}
-        >
-          <ModalContent>
-            <ModalHeader className="flex flex-col gap-1">
-              <span className="text-xl font-bold">{reportData?.report_type || 'Report'}</span>
-              <span className="text-sm font-normal text-default-500">
-                Generated: {new Date().toLocaleString()}
-              </span>
-            </ModalHeader>
-            <ModalBody>
-              {reportLoading ? (
-                <div className="flex justify-center py-12">
-                  <Spinner size="lg" />
-                </div>
-              ) : (
-                renderReportContent()
-              )}
-            </ModalBody>
-            <ModalFooter className="border-t">
-              <div className="flex gap-2 flex-wrap">
-                <Button variant="flat" onPress={onClose}>
-                  Close
-                </Button>
-                <Button color="primary" variant="flat" onPress={printReport}>
-                  🖨️ Print
-                </Button>
-                <Button color="success" onPress={exportToCSV}>
-                  📊 Export CSV
-                </Button>
-                <Button color="secondary" onPress={exportToJSON}>
-                  📋 Export JSON
-                </Button>
-              </div>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
       </div>
     </div>
   );

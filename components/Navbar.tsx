@@ -51,10 +51,10 @@ export function Navbar() {
       return [
         { href: '/dashboard', label: 'Dashboard', icon: '📊' },
         { href: '/products', label: 'Products', icon: '📦' },
-        { href: '/pos', label: 'POS', icon: '🛒' },
-        { href: '/sales', label: 'Sales', icon: '💰' },
         { href: '/stock', label: 'Stock', icon: '📋' },
         { href: '/expenses', label: 'Expenses', icon: '💸' },
+        { href: '/sales', label: 'Sales', icon: '💰' },
+        { href: '/pos', label: 'POS', icon: '🛒' },
       ];
     }
     
