@@ -18,7 +18,8 @@ export function useCategories(storeId?: number | null) {
       // Handle both paginated and non-paginated responses
       setCategories(Array.isArray(data) ? data : (data.results || []));
     } catch (err: unknown) {
-      setError(err.response?.data?.message || 'Failed to fetch categories');
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to fetch categories');
       setCategories([]);
     } finally {
       setLoading(false);
