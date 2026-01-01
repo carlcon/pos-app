@@ -18,7 +18,7 @@ interface StoreContextValue {
 const StoreContext = createContext<StoreContextValue | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const { user, effectivePartnerId, effectiveStoreId, isImpersonatingStore } = useAuth();
+  const { user, effectivePartnerId, effectiveStoreId, isImpersonatingStore, isPartnerAdmin, isStoreLevelUser } = useAuth();
   const partnerId = effectivePartnerId;
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,6 +30,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!partnerId) {
       setStores([]);
       setSelectedStoreId(null);
+      return;
+    }
+
+    // Only fetch stores for partner admins (not for store-level users)
+    if (isStoreLevelUser && !isImpersonatingStore) {
+      setStores([]);
+      setSelectedStoreId(effectiveStoreId);
       return;
     }
 
@@ -86,6 +93,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // If impersonating a store, set it immediately
     if (isImpersonatingStore && effectiveStoreId) {
       setSelectedStoreId(effectiveStoreId);
+    } else if (isStoreLevelUser && effectiveStoreId) {
+      // Store-level users use their assigned store directly
+      setSelectedStoreId(effectiveStoreId);
     } else {
       const persistedId = storageKey ? localStorage.getItem(storageKey) : null;
       if (persistedId) {
@@ -95,7 +105,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     refreshStores();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partnerId, isImpersonatingStore, effectiveStoreId]);
+  }, [partnerId, isImpersonatingStore, effectiveStoreId, isStoreLevelUser]);
 
   const handleSetSelectedStore = (storeId: number | null) => {
     // Don't allow changing store when impersonating
