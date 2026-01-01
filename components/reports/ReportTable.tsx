@@ -135,6 +135,11 @@ const COLUMN_CONFIGS: Record<string, ReportColumn[]> = {
 function formatCellValue(value: any, format?: string): string {
   if (value === null || value === undefined) return '-';
   
+  // If value is already a formatted string (contains currency symbol or percentage), return as-is
+  if (typeof value === 'string' && (value.includes('₱') || value.includes('%'))) {
+    return value;
+  }
+  
   switch (format) {
     case 'currency':
       return `₱${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
